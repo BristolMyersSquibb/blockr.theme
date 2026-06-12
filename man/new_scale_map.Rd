@@ -76,3 +76,25 @@ them with later-wins-by-variable semantics, so a study overrides a default
 catalog by listing replacement bindings after it. Overriding replaces the
 whole binding (no channel-level merge).
 }
+\examples{
+# Fixed colors for pinned levels, a pool for auto-assigned ones, and a
+# board palette as the fallback pool for bare registrations:
+map <- new_scale_map(
+  scale_binding("BOR", color = c(CR = "#006400", PD = "#8b0000")),
+  scale_binding("USUBJID", color = c("#101010", "#202020")),
+  scale_binding("RACE"),
+  palette = c("#0072B2", "#D55E00", "#F0E442")
+)
+
+# A study overrides by listing replacement bindings after a template map:
+study <- new_scale_map(
+  map,
+  scale_binding("BOR", color = c(CR = "#008000", PD = "#FF2C2C"))
+)
+
+# Renderers resolve against the levels actually shown; same level, same
+# color, in every view (runnable board: dev/scale-map-demo.R):
+resolve_scales(study, "BOR", levels = c("PD", "CR", "NEW"))
+resolve_scales(study, "RACE", levels = c("WHITE", "ASIAN"))
+
+}
