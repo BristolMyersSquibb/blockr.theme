@@ -19,13 +19,18 @@ pkgload::load_all("blockr.dm")
 pkgload::load_all("blockr.theme")
 pkgload::load_all("blockr.bi")
 pkgload::load_all("blockr.ggplot")
+pkgload::load_all("blockr.pharma")
 
 # A study map: fixed colors for AESEV and the treatment arms, a board
 # palette as the auto-assignment pool for everything merely registered.
+# The AESEV pins are deliberately NON-standard (sky/violet/pink instead of
+# the amber/orange/red defaults) so it is visible that the patient profile
+# (overview + gantt) takes its severity colors from the map, not from its
+# built-in constants.
 study_scale_map <- new_scale_map(
   scale_binding(
     "AESEV",
-    color = c(MILD = "#CA8A04", MODERATE = "#D97706", SEVERE = "#DC2626")
+    color = c(MILD = "#0EA5E9", MODERATE = "#8B5CF6", SEVERE = "#EC4899")
   ),
   scale_binding("TRT01A", color = c(
     "Placebo"              = "#6D8196",
@@ -56,15 +61,35 @@ board <- new_dock_board(
     # echarts charts hex-for-hex — one color language across both engines.
     arm_by_race_gg = new_ggplot_block(
       type = "bar", x = "RACE", fill = "TRT01A",
-      block_name = "Race by arm (ggplot — same map)")
+      block_name = "Race by arm (ggplot — same map)"),
+    # Patient profile: overview + gantt both take their AE severity colors
+    # from the map's AESEV binding (one resolution, injected into both vizs
+    # by the block server). Filter to a patient that has a severe AE so all
+    # three severities show.
+    severe_patient = new_dm_filter_block(
+      table = "adsl",
+      state = list(
+        conditions = list(list(
+          type = "values", column = "USUBJID",
+          values = list("01-701-1211"), mode = "include"
+        )),
+        operator = "&"
+      ),
+      block_name = "Pick a patient with a severe AE"),
+    pt_profile = new_patient_profile_block(
+      selected = c("patient_overview", "ae_gantt"),
+      block_name = "Patient profile (overview + gantt — same map)")
   ),
   links = links(
-    from = c("data", "adsl", "adsl", "adsl", "adsl"),
-    to = c("adsl", "arm_by_race", "arm_pie", "race_pie", "arm_by_race_gg")
+    from = c("data", "adsl", "adsl", "adsl", "adsl",
+             "data", "severe_patient"),
+    to = c("adsl", "arm_by_race", "arm_pie", "race_pie", "arm_by_race_gg",
+           "severe_patient", "pt_profile")
   ),
   layouts = list(
     Demo = dock_layout(
-      c("arm_by_race", "arm_by_race_gg", "arm_pie", "race_pie")
+      c("arm_by_race", "arm_by_race_gg", "arm_pie", "race_pie",
+        "pt_profile")
     )
   ),
   options = c(
