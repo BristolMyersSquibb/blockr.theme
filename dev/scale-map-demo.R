@@ -11,13 +11,14 @@
 #   Rscript blockr.theme/dev/scale-map-demo.R
 
 options(blockr.dock_is_locked = FALSE)
-options(shiny.port = 3838L, shiny.host = "0.0.0.0")
+# options(shiny.port = 3838L, shiny.host = "0.0.0.0")
 
 pkgload::load_all("blockr.core")
 pkgload::load_all("blockr.dock")
 pkgload::load_all("blockr.dm")
 pkgload::load_all("blockr.theme")
 pkgload::load_all("blockr.bi")
+pkgload::load_all("blockr.ggplot")
 
 # A study map: fixed colors for AESEV and the treatment arms, a board
 # palette as the auto-assignment pool for everything merely registered.
@@ -49,14 +50,22 @@ board <- new_dock_board(
       block_name = "Arm split (pie — group role)"),
     race_pie = new_drilldown_chart_block(
       chart_type = "pie", group = "RACE",
-      block_name = "Race split (auto colors from board palette)")
+      block_name = "Race split (auto colors from board palette)"),
+    # Same variable, different renderer: ggplot consumes the same board map
+    # (fill reads the binding's `color` channel), so the arms match the
+    # echarts charts hex-for-hex — one color language across both engines.
+    arm_by_race_gg = new_ggplot_block(
+      type = "bar", x = "RACE", fill = "TRT01A",
+      block_name = "Race by arm (ggplot — same map)")
   ),
   links = links(
-    from = c("data", "adsl", "adsl", "adsl"),
-    to = c("adsl", "arm_by_race", "arm_pie", "race_pie")
+    from = c("data", "adsl", "adsl", "adsl", "adsl"),
+    to = c("adsl", "arm_by_race", "arm_pie", "race_pie", "arm_by_race_gg")
   ),
   layouts = list(
-    Demo = dock_layout(c("arm_by_race", "arm_pie", "race_pie"))
+    Demo = dock_layout(
+      c("arm_by_race", "arm_by_race_gg", "arm_pie", "race_pie")
+    )
   ),
   options = c(
     dock_board_options(),
