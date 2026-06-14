@@ -17,7 +17,7 @@ pkgload::load_all("blockr.core")
 pkgload::load_all("blockr.dock")
 pkgload::load_all("blockr.dm")
 pkgload::load_all("blockr.theme")
-pkgload::load_all("blockr.bi")
+pkgload::load_all("blockr.viz")
 pkgload::load_all("blockr.ggplot")
 pkgload::load_all("blockr.pharma")
 
@@ -47,13 +47,13 @@ board <- new_dock_board(
     data = new_dm_example_block(dataset = "pharmaverseadam",
       block_name = "ADaM data"),
     adsl = new_dm_pull_block(table = "adsl", block_name = "Pull adsl"),
-    arm_by_race = new_drilldown_chart_block(
+    arm_by_race = new_chart_block(
       chart_type = "bar", group = "RACE", color = "TRT01A",
       block_name = "Race by arm (stacked bar — color role)"),
-    arm_pie = new_drilldown_chart_block(
+    arm_pie = new_chart_block(
       chart_type = "pie", group = "TRT01A",
       block_name = "Arm split (pie — group role)"),
-    race_pie = new_drilldown_chart_block(
+    race_pie = new_chart_block(
       chart_type = "pie", group = "RACE",
       block_name = "Race split (auto colors from board palette)"),
     # Same variable, different renderer: ggplot consumes the same board map
