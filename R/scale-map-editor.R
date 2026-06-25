@@ -47,7 +47,7 @@ scale_map_editor_ui <- function(id) {
   )
 }
 
-scale_map_editor_server <- function(..., session) {
+scale_map_editor_server <- function(board, ..., session) {
   ns <- session$ns
 
   st <- new.env(parent = emptyenv())
@@ -68,7 +68,7 @@ scale_map_editor_server <- function(..., session) {
   }
 
   write_map <- function(map) {
-    blockr.core::set_board_option_value("scale_map", map, session)
+    blockr.core::set_board_option_value("scale_map", map, board$board, session)
   }
 
   structure_sig <- function(map) {
