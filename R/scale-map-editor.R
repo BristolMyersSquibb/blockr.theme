@@ -160,7 +160,11 @@ scale_map_editor_server <- function(board, ..., session) {
     lev_id <- sprintf("sm_nl_%d_%d", gen, bi)
     col_id <- sprintf("sm_nc_%d_%d", gen, bi)
     add_payload <- sprintf(
-      "{action:'addlev', var:%s, level:document.getElementById(%s).value, color:document.getElementById(%s).value}",
+      paste0(
+        "{action:'addlev', var:%s, ",
+        "level:document.getElementById(%s).value, ",
+        "color:document.getElementById(%s).value}"
+      ),
       js_str(var), js_str(ns(lev_id)), js_str(ns(col_id))
     )
 
