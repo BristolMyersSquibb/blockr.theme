@@ -1,6 +1,6 @@
 Package: blockr.theme
 Title: Board-Level Theming for Blockr
-Version: 0.0.0.9000
+Version: 0.0.0.9001
 Authors@R:
     person(given = "Christoph",
            family = "Sax",
@@ -24,7 +24,8 @@ Imports:
     htmltools,
     jsonlite,
     rlang,
-    shiny
+    shiny,
+    utils
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

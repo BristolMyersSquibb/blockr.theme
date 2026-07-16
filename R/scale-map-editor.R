@@ -11,8 +11,18 @@
 # through a single "sm_action" input via Shiny.setInputValue, so there are no
 # dynamic observers to manage.
 
+scale_map_editor_dep <- function() {
+  htmltools::htmlDependency(
+    name = "blockr-theme-scale-map-editor",
+    version = utils::packageVersion("blockr.theme"),
+    src = system.file("js", package = "blockr.theme"),
+    script = "scale-map-editor.js"
+  )
+}
+
 scale_map_editor_ui <- function(id) {
   htmltools::tagList(
+    scale_map_editor_dep(),
     htmltools::tags$style(htmltools::HTML(
       ".bsm-editor { font-size: 0.875rem; }
        .bsm-binding { margin-bottom: 0.5rem; }
@@ -83,13 +93,18 @@ scale_map_editor_server <- function(board, ..., session) {
     as.character(jsonlite::toJSON(x, auto_unbox = TRUE))
   }
 
+  # Every action re-renders the editor, which would drop the sidebar's scroll
+  # offset; save it here, while the current nodes are still on screen.
   funnel_btn <- function(label, payload_js, class = "bsm-rm") {
     htmltools::tags$button(
       type = "button",
       class = class,
       onclick = sprintf(
-        "Shiny.setInputValue(%s, %s, {priority: 'event'})",
-        js_str(ns("sm_action")), payload_js
+        paste0(
+          "window.blockrScaleMapEditor.saveScroll(%s); ",
+          "Shiny.setInputValue(%s, %s, {priority: 'event'})"
+        ),
+        js_str(ns("sm_editor")), js_str(ns("sm_action")), payload_js
       ),
       label
     )
@@ -207,6 +222,11 @@ scale_map_editor_server <- function(board, ..., session) {
       immediate = TRUE,
       session = session
     )
+
+    # Queued, so it reaches the client after the immediate insert above. A
+    # no-op unless a button saved an offset, which is what we want for renders
+    # triggered from outside the editor (restore, assistant edits).
+    session$sendCustomMessage("blockr.theme-scale-map-scroll", list(TRUE))
 
     st$rendered_sig <- structure_sig(map)
     st$render_count(shiny::isolate(st$render_count()) + 1L)
