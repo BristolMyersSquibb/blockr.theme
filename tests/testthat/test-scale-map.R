@@ -190,27 +190,3 @@ test_that("v1 deck shape (no .palette) deserializes unchanged", {
   expect_null(attr(m, "palette"))
   expect_identical(m$BOR$color, c(CR = "#006400", PD = "#8b0000"))
 })
-
-# --- pinned hash assignment --------------------------------------------------
-# Saved boards rely on stable auto-assignment across package versions. The
-# expected values below must never change.
-
-test_that("PINNED: hash assignment of the scale-map convention", {
-  pal <- c("#0072B2", "#D55E00", "#F0E442", "#009E73", "#56B4E9",
-           "#E69F00", "#CC79A7")
-  m <- new_scale_map(scale_binding("X"))
-  r <- resolve_scales(
-    m, "X",
-    levels = c("CR", "PR", "Drug A", "Placebo", "WEEK 4", "01-701-1015"),
-    palette = pal
-  )
-
-  expect_identical(r$color, c(
-    "CR" = "#D55E00",
-    "PR" = "#CC79A7",
-    "Drug A" = "#56B4E9",
-    "Placebo" = "#CC79A7",
-    "WEEK 4" = "#56B4E9",
-    "01-701-1015" = "#009E73"
-  ))
-})

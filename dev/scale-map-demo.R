@@ -8,10 +8,19 @@
 # blockr.theme) and the charts fall back to their standard palette.
 #
 # Run from workspace root:
-#   Rscript blockr.theme/dev/scale-map-demo.R
+#   Rscript blockr.theme/dev/scale-map-demo.R [port]
+
+sm_port <- local({
+  arg <- commandArgs(trailingOnly = TRUE)[1L]
+  env <- Sys.getenv("BLOCKR_PORT", unset = "")
+  raw <- if (!is.na(arg)) arg else if (nzchar(env)) env else "3838"
+  port <- suppressWarnings(as.integer(raw))
+  if (is.na(port)) stop("Not a port: ", raw, call. = FALSE)
+  port
+})
 
 options(blockr.dock_is_locked = FALSE)
-# options(shiny.port = 3838L, shiny.host = "0.0.0.0")
+options(shiny.port = sm_port, shiny.host = "0.0.0.0")
 
 pkgload::load_all("blockr.core")
 pkgload::load_all("blockr.dock")
@@ -86,10 +95,10 @@ board <- new_dock_board(
     to = c("adsl", "arm_by_race", "arm_pie", "race_pie", "arm_by_race_gg",
            "severe_patient", "pt_profile")
   ),
-  layouts = list(
-    Demo = dock_layout(
-      c("arm_by_race", "arm_by_race_gg", "arm_pie", "race_pie",
-        "pt_profile")
+  grids = list(
+    Demo = dock_grid(
+      "arm_by_race", "arm_by_race_gg", "arm_pie", "race_pie",
+      "pt_profile"
     )
   ),
   options = c(

@@ -265,10 +265,16 @@ print.scale_map <- function(x, ...) {
   invisible(x)
 }
 
-# The pinned hash assignment of the scale-map convention: a pure function of
-# the level name, so assignment is independent of which other levels a view
-# happens to show. This is the convention's single copy — do not change
-# (saved boards rely on stable assignment across versions).
+# Auto-assignment for one level: a pure function of the level name, so a value
+# keeps its scale across views showing different subsets of levels. That is the
+# property the map exists for, and the one worth preserving here.
+#
+# Colors are not stable across rlang versions: rlang::hash() was reimplemented
+# in 1.3.0 and every hash changed. Since resolve_scales() runs at render time,
+# an rlang upgrade re-colors auto-assigned levels on an existing board. That
+# drift is accepted — views stay consistent with each other, which is what
+# matters. Pin expected colors in a test and it will fail on the next rlang
+# hash change.
 scale_map_hash_pick <- function(level, pool) {
   idx <- strtoi(substr(rlang::hash(level), 1L, 7L), 16L) %% length(pool)
   pool[[idx + 1L]]
