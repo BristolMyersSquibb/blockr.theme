@@ -8,12 +8,14 @@ Authors@R:
            email = "christoph@cynkra.com",
            comment = c(ORCID = "0000-0002-7192-7044"))
 Description: Optional board-level theming for blockr dashboards. Provides
-    the scale map: per-variable discrete scales (level to color/shape/
-    linetype) carried as a board option and resolved at render time, so the
-    same data value renders identically in every view. Includes the map
-    constructors, the resolver, a board-level palette, and a sidebar editor.
-    Renderers consume the map through a soft dependency; without this
-    package they fall back to their standard colors.
+    two complementary layers. The scale map pins per-variable discrete
+    scales (level to color/shape/linetype), carried as a board option and
+    resolved at render time so the same data value renders identically in
+    every view. The theme object bundles a board's house style -- UI chrome
+    tokens, rendered-exhibit palettes, an optional scale map, document
+    templates and a font -- with built-in BMS, cynkra and open blockr
+    presets. Both layers are consumed through soft, additive seams; without
+    this package a board falls back to the blockr defaults.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

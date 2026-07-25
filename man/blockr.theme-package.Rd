@@ -6,7 +6,7 @@
 \alias{blockr.theme-package}
 \title{blockr.theme: Board-Level Theming for Blockr}
 \description{
-Optional board-level theming for blockr dashboards. Provides the scale map: per-variable discrete scales (level to color/shape/ linetype) carried as a board option and resolved at render time, so the same data value renders identically in every view. Includes the map constructors, the resolver, a board-level palette, and a sidebar editor. Renderers consume the map through a soft dependency; without this package they fall back to their standard colors.
+Optional board-level theming for blockr dashboards. Provides two complementary layers. The scale map pins per-variable discrete scales (level to color/shape/linetype), carried as a board option and resolved at render time so the same data value renders identically in every view. The theme object bundles a board's house style -- UI chrome tokens, rendered-exhibit palettes, an optional scale map, document templates and a font -- with built-in BMS, cynkra and open blockr presets. Both layers are consumed through soft, additive seams; without this package a board falls back to the blockr defaults.
 }
 \author{
 \strong{Maintainer}: Christoph Sax \email{christoph@cynkra.com} (\href{https://orcid.org/0000-0002-7192-7044}{ORCID})
