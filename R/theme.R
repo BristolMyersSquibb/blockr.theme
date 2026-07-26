@@ -12,6 +12,13 @@
 #                  hard-coded to override. Vanilla == the fallbacks.
 #   * exhibits  -- rendered-output styling read as `blockr.viz.*` options
 #                  (e.g. flextable header bands). Content, not chrome.
+#   * palettes  -- colour palettes keyed by ROLE (what the colour is for),
+#                  plus any palette definitions the theme contributes. One
+#                  vocabulary for every consumer: before this, series colours
+#                  were a hard-coded constant in blockr.viz, header bands were
+#                  a blockr.viz option and heatmap ramps were a function
+#                  argument, so a client theme could reach exactly one of the
+#                  three. See theme_palette().
 #   * scales    -- an optional scale_map (data value -> colour/shape).
 #   * templates -- document templates keyed by FORMAT (pptx today; docx /
 #                  quarto / latex later). Either a pointer into another
@@ -41,6 +48,17 @@
 #'   cascade, since the semantic tokens reference the scale.
 #' @param exhibits Named list of `blockr.viz.*` option values (the leading
 #'   `blockr.viz.` is added), e.g. `list(ft_header_bg = c(...))`.
+#' @param palettes Named list mapping a colour ROLE to a palette name (or to a
+#'   literal colour vector). Roles are `categorical` (series identity),
+#'   `identity` (many-level pools such as subject ids), `sequential`,
+#'   `diverging` and `bands` (table header / emphasis fills). Unset roles fall
+#'   back to the blockr defaults, so a theme names only what it changes. See
+#'   [theme_palette()].
+#' @param palette_defs Named list of palette definitions this theme
+#'   contributes, each a colour vector or a `function(n)`. They become
+#'   available to [palette_colors()] / [palette_ramp()] and to the scale-map
+#'   editor's palette picker for as long as the theme is applied, without
+#'   mutating any global registry.
 #' @param scales Optional [new_scale_map()] (or plain list of that shape).
 #' @param templates Named list of document templates keyed by format
 #'   (`pptx`, `docx`, `quarto`, ...). Each value is a [pkg_template()] /
@@ -63,6 +81,7 @@
 #' cat(theme_css(th))
 #' @export
 blockr_theme <- function(name, chrome = list(), exhibits = list(),
+                         palettes = list(), palette_defs = list(),
                          scales = NULL, templates = list(),
                          font_family = NULL, webfont = NULL,
                          description = NULL) {
@@ -93,6 +112,19 @@ blockr_theme <- function(name, chrome = list(), exhibits = list(),
   chrome <- named_list(chrome, "chrome")
   exhibits <- named_list(exhibits, "exhibits")
   templates <- named_list(templates, "templates")
+  palettes <- named_list(palettes, "palettes")
+  palette_defs <- named_list(palette_defs, "palette_defs")
+
+  unknown <- setdiff(names(palettes), PALETTE_ROLES)
+  if (length(unknown)) {
+    stop("Unknown palette role(s): ", paste(unknown, collapse = ", "),
+         ". Known roles: ", paste(PALETTE_ROLES, collapse = ", "), ".",
+         call. = FALSE)
+  }
+
+  # Fail here rather than at render time: a malformed definition is an
+  # authoring mistake in the theme, and the theme is built at startup.
+  lapply(palette_defs, as_palette_entry)
 
   if (!is.null(scales)) {
     scales <- as_scale_map(scales)
@@ -104,6 +136,8 @@ blockr_theme <- function(name, chrome = list(), exhibits = list(),
       description = description,
       chrome = chrome,
       exhibits = exhibits,
+      palettes = palettes,
+      palette_defs = palette_defs,
       scales = scales,
       templates = templates,
       font_family = font_family,
@@ -129,6 +163,18 @@ print.blockr_theme <- function(x, ...) {
   cat("  chrome    : ", length(x$chrome), " token(s)\n", sep = "")
   cat("  exhibits  : ",
       if (length(x$exhibits)) paste(names(x$exhibits), collapse = ", ") else "-",
+      "\n", sep = "")
+  cat("  palettes  : ",
+      if (length(x$palettes)) {
+        paste(vapply(names(x$palettes), function(r) {
+          v <- x$palettes[[r]]
+          paste0(r, "=", if (length(v) == 1L && is.character(v)) v else
+            sprintf("<%d colors>", length(v)))
+        }, character(1L)), collapse = ", ")
+      } else "-",
+      if (length(x$palette_defs)) {
+        sprintf(" (+%d definition(s))", length(x$palette_defs))
+      },
       "\n", sep = "")
   cat("  scales    : ",
       if (is.null(x$scales)) "-" else sprintf("scale_map[%d]", length(x$scales)),
@@ -305,11 +351,99 @@ theme_head <- function(x, selector = ":root") {
 #' @export
 apply_theme_options <- function(x) {
   stopifnot(is_blockr_theme(x))
-  if (!length(x$exhibits)) {
-    return(invisible(list()))
+  # The theme itself is recorded too, so a consumer can call theme_palette()
+  # with no arguments instead of having to be handed the object. Renderers run
+  # deep inside a board's expressions, where threading a theme through would
+  # mean touching every block signature.
+  exhibits <- if (length(x$exhibits)) {
+    stats::setNames(x$exhibits, paste0("blockr.viz.", names(x$exhibits)))
+  } else {
+    list()
   }
-  opts <- stats::setNames(x$exhibits, paste0("blockr.viz.", names(x$exhibits)))
-  invisible(options(opts))
+  invisible(options(c(exhibits, list(blockr.theme.current = x))))
+}
+
+# --- palettes -------------------------------------------------------------
+
+PALETTE_ROLES <- c(
+  "categorical", "identity", "sequential", "diverging", "bands"
+)
+
+# Vanilla: what a board looks like with no theme applied. `bands` has no
+# default -- blockr.viz keeps its own header-band behaviour when unset, so an
+# untouched app renders exactly as before.
+PALETTE_ROLE_DEFAULTS <- list(
+  categorical = "Blockr",
+  identity = "Many",
+  sequential = "Blues",
+  diverging = "Blue-Red 3",
+  bands = NULL
+)
+
+#' The theme's palette for a colour role
+#'
+#' Resolves what colours to use for a given *job*, which is the vocabulary a
+#' theme is written in: `categorical` for series identity, `identity` for
+#' many-level pools (subject ids), `sequential` for magnitude, `diverging` for
+#' polarity, `bands` for table header and emphasis fills.
+#'
+#' Consumers ask by role and never name a palette, so one theme entry
+#' recolours every renderer that shares the role. With no theme applied the
+#' blockr defaults answer, so a themeless board is unchanged.
+#'
+#' @param role One of `categorical`, `identity`, `sequential`, `diverging`,
+#'   `bands`.
+#' @param n Number of colours. `NULL` returns the palette's own length for a
+#'   fixed set, and is an error for a ramp.
+#' @param theme A [blockr_theme()]; defaults to the one [use_theme()] /
+#'   [apply_theme_options()] last applied, or none.
+#' @return A character vector of hex colours, or `NULL` when the role has no
+#'   value and no default (`bands`).
+#' @examples
+#' theme_palette("categorical", 3)
+#' theme_palette("sequential", 5, theme = theme_blockr())
+#' @export
+theme_palette <- function(role, n = NULL, theme = current_theme()) {
+  role <- match.arg(role, PALETTE_ROLES)
+
+  spec <- if (is_blockr_theme(theme)) theme$palettes[[role]]
+  spec <- spec %||% PALETTE_ROLE_DEFAULTS[[role]]
+
+  if (is.null(spec)) {
+    return(NULL)
+  }
+
+  # A role may be answered with literal colours (`bands` usually is) rather
+  # than a palette name.
+  if (length(spec) > 1L || !is.null(names(spec))) {
+    return(if (is.null(n)) spec else rep_len(spec, n))
+  }
+
+  defs <- if (is_blockr_theme(theme)) theme$palette_defs
+  entry <- lookup_palette(spec, defs)
+
+  if (!is.null(entry) && !is.null(entry$fn)) {
+    if (is.null(n)) {
+      stop("`n` is required: role `", role, "` resolves to ramp `", spec,
+           "`.", call. = FALSE)
+    }
+    return(palette_ramp(n, spec, defs = defs))
+  }
+
+  if (identical(role, "sequential") || identical(role, "diverging")) {
+    if (is.null(n)) {
+      stop("`n` is required for role `", role, "`.", call. = FALSE)
+    }
+    return(palette_ramp(n, spec, defs = defs))
+  }
+
+  palette_colors(n, spec, defs = defs)
+}
+
+#' @rdname theme_palette
+#' @export
+current_theme <- function() {
+  getOption("blockr.theme.current")
 }
 
 # --- templates ------------------------------------------------------------
