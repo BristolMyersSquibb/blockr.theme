@@ -6,7 +6,9 @@ test_that("palette_colors is prefix-stable and palette_ramp is not", {
 
   # A ramp re-interpolates, which is exactly why the two are separate
   # functions rather than one with a `type` argument.
-  expect_false(identical(palette_ramp(3, "Blues"), palette_ramp(6, "Blues")[1:3]))
+  expect_false(
+    identical(palette_ramp(3, "Blues"), palette_ramp(6, "Blues")[1:3])
+  )
 })
 
 test_that("palette_colors truncates rather than cycling, like base", {
@@ -141,5 +143,7 @@ test_that("theme_blockr's roles resolve to the blockr palettes", {
   bl <- theme_blockr()
   expect_identical(theme_palette("categorical", 6, bl), palette_colors(6))
   expect_identical(theme_palette("bands", theme = bl), bl$exhibits$ft_header_bg)
-  expect_identical(attr(bl$scales, "palette"), palette_colors(palette = "Blockr"))
+  expect_identical(
+    attr(bl$scales, "palette"), palette_colors(palette = "Blockr")
+  )
 })

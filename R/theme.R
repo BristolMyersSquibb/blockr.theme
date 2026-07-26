@@ -160,28 +160,43 @@ print.blockr_theme <- function(x, ...) {
   if (!is.null(x$description)) {
     cat("  ", x$description, "\n", sep = "")
   }
+  nms <- function(v) {
+    if (!length(v)) {
+      return("-")
+    }
+    paste(names(v), collapse = ", ")
+  }
+
+  palettes <- if (!length(x$palettes)) {
+    "-"
+  } else {
+    one <- function(r) {
+      v <- x$palettes[[r]]
+      spec <- if (length(v) == 1L && is.character(v)) {
+        v
+      } else {
+        sprintf("<%d colors>", length(v))
+      }
+      paste0(r, "=", spec)
+    }
+    paste(vapply(names(x$palettes), one, character(1L)), collapse = ", ")
+  }
+
+  defs <- if (length(x$palette_defs)) {
+    sprintf(" (+%d definition(s))", length(x$palette_defs))
+  }
+
+  scales <- if (is.null(x$scales)) {
+    "-"
+  } else {
+    sprintf("scale_map[%d]", length(x$scales))
+  }
+
   cat("  chrome    : ", length(x$chrome), " token(s)\n", sep = "")
-  cat("  exhibits  : ",
-      if (length(x$exhibits)) paste(names(x$exhibits), collapse = ", ") else "-",
-      "\n", sep = "")
-  cat("  palettes  : ",
-      if (length(x$palettes)) {
-        paste(vapply(names(x$palettes), function(r) {
-          v <- x$palettes[[r]]
-          paste0(r, "=", if (length(v) == 1L && is.character(v)) v else
-            sprintf("<%d colors>", length(v)))
-        }, character(1L)), collapse = ", ")
-      } else "-",
-      if (length(x$palette_defs)) {
-        sprintf(" (+%d definition(s))", length(x$palette_defs))
-      },
-      "\n", sep = "")
-  cat("  scales    : ",
-      if (is.null(x$scales)) "-" else sprintf("scale_map[%d]", length(x$scales)),
-      "\n", sep = "")
-  cat("  templates : ",
-      if (length(x$templates)) paste(names(x$templates), collapse = ", ") else "-",
-      "\n", sep = "")
+  cat("  exhibits  : ", nms(x$exhibits), "\n", sep = "")
+  cat("  palettes  : ", palettes, defs, "\n", sep = "")
+  cat("  scales    : ", scales, "\n", sep = "")
+  cat("  templates : ", nms(x$templates), "\n", sep = "")
   if (!is.null(x$font_family)) {
     cat("  font      : ", x$font_family, "\n", sep = "")
   }
@@ -225,7 +240,10 @@ webfont_face_css <- function(webfont) {
   if (!requireNamespace(webfont$package, quietly = TRUE)) {
     return("")
   }
-  path <- system.file(file.path("fonts", webfont$file), package = webfont$package)
+  path <- system.file(
+    file.path("fonts", webfont$file),
+    package = webfont$package
+  )
   if (!nzchar(path)) {
     return("")
   }
@@ -287,7 +305,9 @@ theme_css <- function(x, selector = ":root") {
 
   decls <- vapply(
     names(x$chrome),
-    function(nm) sprintf("  --blockr-%s: %s;", normalize_token(nm), x$chrome[[nm]]),
+    function(nm) {
+      sprintf("  --blockr-%s: %s;", normalize_token(nm), x$chrome[[nm]])
+    },
     character(1L)
   )
 
