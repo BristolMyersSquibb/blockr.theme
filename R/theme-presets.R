@@ -40,11 +40,17 @@ theme_blockr <- function() {
     exhibits = list(
       ft_header_bg = c(.stub = "#EEEEEE", "#0072B2", "#009E73", "#E69F00")
     ),
-    scales = new_scale_map(
-      palette = c(
-        "#0072b2", "#e69f00", "#009e73", "#cc79a7", "#56b4e9", "#d55e00"
-      )
+    # The open theme names the roles it means rather than restating hexes: the
+    # defaults ARE the blockr palettes, so this documents the mapping and gives
+    # client themes a worked example of the slot to override.
+    palettes = list(
+      categorical = "Blockr",
+      identity = "Many",
+      sequential = "Blues",
+      diverging = "Blue-Red 3",
+      bands = c(.stub = "#EEEEEE", "#0072B2", "#009E73", "#E69F00")
     ),
+    scales = new_scale_map(palette = palette_colors(palette = "Blockr")),
     templates = list(
       # CONTAINED: shipped in this package's inst/templates, so the open
       # theme is self-sufficient (no client package needed to render).

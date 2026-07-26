@@ -9,6 +9,8 @@ blockr_theme(
   name,
   chrome = list(),
   exhibits = list(),
+  palettes = list(),
+  palette_defs = list(),
   scales = NULL,
   templates = list(),
   font_family = NULL,
@@ -30,6 +32,19 @@ cascade, since the semantic tokens reference the scale.}
 
 \item{exhibits}{Named list of \verb{blockr.viz.*} option values (the leading
 \code{blockr.viz.} is added), e.g. \code{list(ft_header_bg = c(...))}.}
+
+\item{palettes}{Named list mapping a colour ROLE to a palette name (or to a
+literal colour vector). Roles are \code{categorical} (series identity),
+\code{identity} (many-level pools such as subject ids), \code{sequential},
+\code{diverging} and \code{bands} (table header / emphasis fills). Unset roles fall
+back to the blockr defaults, so a theme names only what it changes. See
+\code{\link[=theme_palette]{theme_palette()}}.}
+
+\item{palette_defs}{Named list of palette definitions this theme
+contributes, each a colour vector or a \verb{function(n)}. They become
+available to \code{\link[=palette_colors]{palette_colors()}} / \code{\link[=palette_ramp]{palette_ramp()}} and to the scale-map
+editor's palette picker for as long as the theme is applied, without
+mutating any global registry.}
 
 \item{scales}{Optional \code{\link[=new_scale_map]{new_scale_map()}} (or plain list of that shape).}
 
