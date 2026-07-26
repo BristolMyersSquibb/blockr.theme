@@ -440,6 +440,22 @@ theme_palette <- function(role, n = NULL, theme = current_theme()) {
   }
 
   defs <- if (is_blockr_theme(theme)) theme$palette_defs
+
+  # A board can outlive the theme that named its palette: saved under a client
+  # theme, reopened where that package is absent. Degrade to the role's own
+  # default rather than letting the name error out of the render -- and to the
+  # ROLE's default specifically, so a missing ramp is replaced by a ramp and
+  # not by a qualitative set.
+  if (!palette_exists(spec, defs)) {
+    fallback <- PALETTE_ROLE_DEFAULTS[[role]]
+    if (is.null(fallback)) {
+      warn_unknown_palette(spec, "none")
+      return(NULL)
+    }
+    warn_unknown_palette(spec, fallback)
+    spec <- fallback
+  }
+
   entry <- lookup_palette(spec, defs)
 
   if (!is.null(entry) && !is.null(entry$fn)) {

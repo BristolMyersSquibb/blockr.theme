@@ -139,6 +139,50 @@ test_that("theme_palette reads the applied theme when none is passed", {
   expect_identical(theme_palette("categorical", 2), palette_colors(2))
 })
 
+test_that("an unresolvable palette degrades instead of failing the render", {
+  # The case this exists for: a board saved under a client theme, reopened in
+  # a deploy where that package is absent. The name is dangling, and a render
+  # must not die over it.
+  reset <- function() rm(list = ls(palette_warn_seen), envir = palette_warn_seen)
+
+  reset()
+  expect_warning(cols <- palette_colors(3, "No Such Palette"), "Unknown palette")
+  expect_identical(cols, palette_colors(3))
+
+  reset()
+  expect_warning(ramp <- palette_ramp(3, "No Such Ramp"), "Unknown palette")
+  expect_identical(ramp, palette_ramp(3, "Blues"))
+
+  # The role's OWN default answers, so a missing ramp is replaced by a ramp
+  # and not by a qualitative set.
+  reset()
+  th <- blockr_theme("t", palettes = list(sequential = "Gone"))
+  expect_warning(seq3 <- theme_palette("sequential", 3, th), "Unknown palette")
+  expect_identical(seq3, palette_ramp(3, "Blues"))
+
+  reset()
+  th2 <- blockr_theme("t", palettes = list(categorical = "Gone"))
+  expect_warning(cat3 <- theme_palette("categorical", 3, th2), "Unknown palette")
+  expect_identical(cat3, palette_colors(3))
+
+  # `bands` has no default: NULL, so the consumer keeps its own behaviour.
+  reset()
+  th3 <- blockr_theme("t", palettes = list(bands = "Gone"))
+  expect_warning(expect_null(theme_palette("bands", theme = th3)), "Unknown")
+
+  # One warning per name per session: a palette resolves on every render, so
+  # repeats would bury the log.
+  reset()
+  expect_warning(palette_colors(3, "Quiet After This"), "Unknown palette")
+  expect_silent(palette_colors(3, "Quiet After This"))
+
+  # Falling back must not mask real names, including base's partial matching.
+  expect_silent(palette_ramp(3, "Viridis"))
+  expect_identical(palette_ramp(3, "Viridis"), grDevices::hcl.colors(3, "Viridis"))
+  expect_true(palette_exists("Okabe-Ito"))
+  expect_false(palette_exists("No Such Palette"))
+})
+
 test_that("theme_blockr's roles resolve to the blockr palettes", {
   bl <- theme_blockr()
   expect_identical(theme_palette("categorical", 6, bl), palette_colors(6))

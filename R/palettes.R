@@ -139,6 +139,46 @@ lookup_palette <- function(palette, defs = NULL) {
   NULL
 }
 
+# Names of the palettes a role falls back to when nothing resolves. Kept
+# separate from PALETTE_ROLE_DEFAULTS (theme.R) because these must be entries
+# of THIS registry: falling back to a name that could itself be missing would
+# reintroduce the failure we are recovering from.
+PALETTE_FALLBACK_QUAL <- "Blockr"
+PALETTE_FALLBACK_RAMP <- "Blues"
+
+# Can this name be resolved by anyone -- a theme, us, or grDevices? Asked
+# rather than assumed, because grDevices errors on an unknown name (and
+# partial-matches known ones, so a membership test would reject valid
+# abbreviations).
+palette_exists <- function(palette, defs = NULL) {
+  if (!is.character(palette) || length(palette) != 1L) {
+    return(FALSE)
+  }
+  if (!is.null(lookup_palette(palette, defs))) {
+    return(TRUE)
+  }
+  ok <- function(expr) {
+    !is.null(tryCatch(expr, error = function(e) NULL, warning = function(w) NULL))
+  }
+  ok(grDevices::palette.colors(1L, palette)) || ok(grDevices::hcl.colors(1L, palette))
+}
+
+# One warning per unresolved name per session. A palette resolves on every
+# render, so warning each time would bury the log in repeats of a single
+# misconfiguration.
+palette_warn_seen <- new.env(parent = emptyenv())
+
+warn_unknown_palette <- function(palette, used) {
+  key <- paste0(palette, "->", used)
+  if (is.null(palette_warn_seen[[key]])) {
+    palette_warn_seen[[key]] <- TRUE
+    warning("Unknown palette `", palette, "`; using `", used,
+            "`. A theme that defines it may not be loaded.",
+            call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 # A theme contributes either a plain colour vector or a function(n).
 as_palette_entry <- function(x) {
   if (is.function(x)) {
@@ -213,7 +253,16 @@ palette_colors <- function(n = NULL, palette = "Blockr", alpha = NULL,
     if (!is.null(alpha)) {
       args$alpha <- alpha
     }
-    return(do.call(grDevices::palette.colors, args))
+    out <- tryCatch(do.call(grDevices::palette.colors, args),
+                    error = function(e) NULL)
+    if (!is.null(out)) {
+      return(out)
+    }
+    # Never fail a render over a name: a board can outlive the theme that
+    # defined its palette (opened in a deploy without the client package, or
+    # after a theme is renamed). Degrade to the house palette and say so once.
+    warn_unknown_palette(palette, PALETTE_FALLBACK_QUAL)
+    return(palette_colors(n, PALETTE_FALLBACK_QUAL, alpha, recycle, names))
   }
 
   cols <- entry$colors
@@ -249,7 +298,13 @@ palette_ramp <- function(n, palette = "Blues", alpha = NULL, rev = FALSE,
   entry <- lookup_palette(palette, defs)
 
   cols <- if (is.null(entry)) {
-    grDevices::hcl.colors(n, palette, rev = rev)
+    out <- tryCatch(grDevices::hcl.colors(n, palette, rev = rev),
+                    error = function(e) NULL)
+    if (is.null(out)) {
+      warn_unknown_palette(palette, PALETTE_FALLBACK_RAMP)
+      out <- palette_ramp(n, PALETTE_FALLBACK_RAMP, rev = rev)
+    }
+    out
   } else if (!is.null(entry$fn)) {
     out <- entry$fn(n)
     if (rev) rev(out) else out
