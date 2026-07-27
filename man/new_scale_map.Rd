@@ -6,6 +6,7 @@
 \alias{is_scale_map}
 \alias{as_scale_map}
 \alias{resolve_scales}
+\alias{resolve_scales_col}
 \alias{board_scale_map}
 \alias{new_scale_map_option}
 \title{Scale map: study-wide level aesthetics}
@@ -19,6 +20,8 @@ is_scale_map(x)
 as_scale_map(x)
 
 resolve_scales(map, var, levels, palette = NULL)
+
+resolve_scales_col(map, var, column, palette = NULL)
 
 board_scale_map()
 
@@ -48,6 +51,14 @@ bindings)}
 
 \item{levels}{Character vector of levels actually shown (pass
 \code{levels(col)} for factors, \code{unique(as.character(col))} otherwise)}
+
+\item{column}{The data column itself (not just its name). Levels are taken
+from it (factor levels, else observed values in appearance order, \code{NA}
+dropped), and when \code{var} is not bound in the map the column's
+\code{blockr_source} attribute -- the provenance stamped by column-copying
+blocks such as the picker -- is tried instead, so a copy inherits its
+source column's binding (a "color" column picked from SEX keeps the
+fixed SEX colors).}
 
 \item{category}{Settings sidebar category}
 }

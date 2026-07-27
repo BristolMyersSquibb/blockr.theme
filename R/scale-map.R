@@ -348,6 +348,40 @@ resolve_scales <- function(map, var, levels, palette = NULL) {
   res
 }
 
+#' @param column The data column itself (not just its name). Levels are taken
+#'   from it (factor levels, else observed values in appearance order, `NA`
+#'   dropped), and when `var` is not bound in the map the column's
+#'   `blockr_source` attribute -- the provenance stamped by column-copying
+#'   blocks such as the picker -- is tried instead, so a copy inherits its
+#'   source column's binding (a "color" column picked from SEX keeps the
+#'   fixed SEX colors).
+#' @rdname new_scale_map
+#' @export
+resolve_scales_col <- function(map, var, column, palette = NULL) {
+  m <- as_scale_map(map)
+  if (is.null(m) || is.null(var)) {
+    return(NULL)
+  }
+
+  levels <- if (is.factor(column)) {
+    levels(column)
+  } else {
+    lv <- unique(as.character(column))
+    lv[!is.na(lv)]
+  }
+
+  bind_var <- var
+  if (!var %in% names(m)) {
+    src <- attr(column, "blockr_source", exact = TRUE)
+    if (is.character(src) && length(src) == 1L && nzchar(src) &&
+          src %in% names(m)) {
+      bind_var <- src
+    }
+  }
+
+  resolve_scales(m, bind_var, levels = levels, palette = palette)
+}
+
 #' @rdname new_scale_map
 #' @export
 board_scale_map <- function() {
