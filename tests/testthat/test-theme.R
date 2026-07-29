@@ -71,6 +71,41 @@ test_that("templates resolve from a pointer, a local file and a path", {
   expect_identical(theme_template(th3, "pptx"), tmp)
 })
 
+test_that("a template resolves out of a load_all'd package's inst/", {
+  # The vendored-client deployment: the package is SOURCES in the app bundle
+  # and pkgload::load_all()'d, so base::system.file() -- which is what this
+  # installed package calls -- looks for <root>/templates and misses the
+  # <root>/inst/templates the sources have. Mocked rather than load_all'd:
+  # the branch is exactly "system.file said nothing, the source root has it".
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "inst", "templates"), recursive = TRUE)
+  file.create(file.path(root, "inst", "templates", "deck.pptx"))
+
+  local_mocked_bindings(
+    requireNamespace = function(...) TRUE,
+    system.file = function(...) "",
+    find.package = function(...) root,
+    .package = "base"
+  )
+
+  th <- blockr_theme(
+    "client",
+    templates = list(pptx = pkg_template("client.pkg", "templates/deck.pptx"))
+  )
+
+  expect_identical(
+    theme_template(th, "pptx"),
+    file.path(root, "inst", "templates", "deck.pptx")
+  )
+
+  # Still soft when neither branch has the file.
+  th2 <- blockr_theme(
+    "client",
+    templates = list(pptx = pkg_template("client.pkg", "templates/no.pptx"))
+  )
+  expect_null(theme_template(th2, "pptx"))
+})
+
 test_that("theme_scale_map_option is built only when scales are present", {
   expect_null(theme_scale_map_option(blockr_theme("t")))
   opt <- theme_scale_map_option(theme_blockr())

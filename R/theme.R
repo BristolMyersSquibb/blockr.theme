@@ -47,7 +47,11 @@
 #'   (`blue-600`) plus the semantic layer (`color-primary`) shifts the whole
 #'   cascade, since the semantic tokens reference the scale.
 #' @param exhibits Named list of `blockr.viz.*` option values (the leading
-#'   `blockr.viz.` is added), e.g. `list(ft_header_bg = c(...))`.
+#'   `blockr.viz.` is added), e.g. `list(ft_header_bg = c(...))`. Also honoured
+#'   here: `ft_font`, the typeface static tables are set in. Name it when the
+#'   theme's deck template uses a face of its own -- otherwise a rendered deck
+#'   picks the template's font up at render time, but the on-screen table does
+#'   not.
 #' @param palettes Named list mapping a colour ROLE to a palette name (or to a
 #'   literal colour vector). Roles are `categorical` (series identity),
 #'   `identity` (many-level pools such as subject ids), `sequential`,
@@ -237,14 +241,8 @@ webfont_face_css <- function(webfont) {
   if (is.null(webfont)) {
     return("")
   }
-  if (!requireNamespace(webfont$package, quietly = TRUE)) {
-    return("")
-  }
-  path <- system.file(
-    file.path("fonts", webfont$file),
-    package = webfont$package
-  )
-  if (!nzchar(path)) {
+  path <- pkg_asset(webfont$package, file.path("fonts", webfont$file))
+  if (is.null(path)) {
     return("")
   }
   raw <- readBin(path, "raw", file.info(path)$size)
@@ -519,16 +517,55 @@ theme_template <- function(x, format = "pptx") {
   resolve_template_ref(x$templates[[format]])
 }
 
+# A file shipped in another package's `inst/`, or NULL.
+#
+# Not plain system.file(), because of the deployment this package exists to
+# serve. A client theme lives in a PRIVATE package, and a client's Connect
+# cannot install private repos -- so that package ships as SOURCES inside the
+# app bundle and is pkgload::load_all()'d at startup. pkgload shims
+# system.file() so that `inst/` is transparent, but only for code inside the
+# load_all()'d package itself and for the global environment: an INSTALLED
+# package such as this one calls base::system.file(), which looks for
+# `<pkg>/templates/deck.pptx` where the sources have `<pkg>/inst/templates/
+# deck.pptx`, and gets "".
+#
+# The failure was silent and expensive to read back. theme_template() returned
+# NULL, so the render fell through to blockr.outline's stock deck and produced
+# a perfectly good pptx in the wrong master -- the house font and logo simply
+# absent, with nothing anywhere saying the house deck had not been found.
+#
+# Both branches are checked because the same theme has to work either way: a
+# client package that IS installed (a dev machine, an internal repo) resolves
+# through system.file, and the vendored copy resolves through the source root.
+pkg_asset <- function(package, file) {
+
+  if (!requireNamespace(package, quietly = TRUE)) {
+    return(NULL)
+  }
+
+  path <- system.file(file, package = package)
+
+  if (nzchar(path)) {
+    return(path)
+  }
+
+  root <- tryCatch(find.package(package), error = function(e) NULL)
+
+  if (is.null(root)) {
+    return(NULL)
+  }
+
+  path <- file.path(root, "inst", file)
+
+  if (file.exists(path)) path else NULL
+}
+
 resolve_template_ref <- function(t) {
   if (is.null(t)) {
     return(NULL)
   }
   if (inherits(t, "blockr_template_ref")) {
-    if (!requireNamespace(t$package, quietly = TRUE)) {
-      return(NULL)
-    }
-    path <- system.file(t$file, package = t$package)
-    return(if (nzchar(path)) path else NULL)
+    return(pkg_asset(t$package, t$file))
   }
   if (is.character(t) && length(t) == 1L && file.exists(t)) {
     return(t)

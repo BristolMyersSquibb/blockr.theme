@@ -31,7 +31,11 @@ friendly aliases are accepted (\code{primary}, \code{primary_hover}, \code{prima
 cascade, since the semantic tokens reference the scale.}
 
 \item{exhibits}{Named list of \verb{blockr.viz.*} option values (the leading
-\code{blockr.viz.} is added), e.g. \code{list(ft_header_bg = c(...))}.}
+\code{blockr.viz.} is added), e.g. \code{list(ft_header_bg = c(...))}. Also honoured
+here: \code{ft_font}, the typeface static tables are set in. Name it when the
+theme's deck template uses a face of its own -- otherwise a rendered deck
+picks the template's font up at render time, but the on-screen table does
+not.}
 
 \item{palettes}{Named list mapping a colour ROLE to a palette name (or to a
 literal colour vector). Roles are \code{categorical} (series identity),
