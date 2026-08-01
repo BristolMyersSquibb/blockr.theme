@@ -158,9 +158,12 @@ palette_exists <- function(palette, defs = NULL) {
     return(TRUE)
   }
   ok <- function(expr) {
-    !is.null(tryCatch(expr, error = function(e) NULL, warning = function(w) NULL))
+    !is.null(tryCatch(expr,
+                      error = function(e) NULL,
+                      warning = function(w) NULL))
   }
-  ok(grDevices::palette.colors(1L, palette)) || ok(grDevices::hcl.colors(1L, palette))
+  ok(grDevices::palette.colors(1L, palette)) ||
+    ok(grDevices::hcl.colors(1L, palette))
 }
 
 # One warning per unresolved name per session. A palette resolves on every

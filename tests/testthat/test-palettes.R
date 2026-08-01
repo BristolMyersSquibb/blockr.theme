@@ -143,10 +143,13 @@ test_that("an unresolvable palette degrades instead of failing the render", {
   # The case this exists for: a board saved under a client theme, reopened in
   # a deploy where that package is absent. The name is dangling, and a render
   # must not die over it.
-  reset <- function() rm(list = ls(palette_warn_seen), envir = palette_warn_seen)
+  reset <- function() {
+    rm(list = ls(palette_warn_seen), envir = palette_warn_seen)
+  }
 
   reset()
-  expect_warning(cols <- palette_colors(3, "No Such Palette"), "Unknown palette")
+  expect_warning(cols <- palette_colors(3, "No Such Palette"),
+                 "Unknown palette")
   expect_identical(cols, palette_colors(3))
 
   reset()
@@ -162,7 +165,8 @@ test_that("an unresolvable palette degrades instead of failing the render", {
 
   reset()
   th2 <- blockr_theme("t", palettes = list(categorical = "Gone"))
-  expect_warning(cat3 <- theme_palette("categorical", 3, th2), "Unknown palette")
+  expect_warning(cat3 <- theme_palette("categorical", 3, th2),
+                 "Unknown palette")
   expect_identical(cat3, palette_colors(3))
 
   # `bands` has no default: NULL, so the consumer keeps its own behaviour.
@@ -178,7 +182,8 @@ test_that("an unresolvable palette degrades instead of failing the render", {
 
   # Falling back must not mask real names, including base's partial matching.
   expect_silent(palette_ramp(3, "Viridis"))
-  expect_identical(palette_ramp(3, "Viridis"), grDevices::hcl.colors(3, "Viridis"))
+  expect_identical(palette_ramp(3, "Viridis"),
+                   grDevices::hcl.colors(3, "Viridis"))
   expect_true(palette_exists("Okabe-Ito"))
   expect_false(palette_exists("No Such Palette"))
 })
