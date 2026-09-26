@@ -190,3 +190,23 @@ test_that("v1 deck shape (no .palette) deserializes unchanged", {
   expect_null(attr(m, "palette"))
   expect_identical(m$BOR$color, c(CR = "#006400", PD = "#8b0000"))
 })
+
+test_that("the scale map summarises as its number of variables", {
+  map <- as_scale_map(list(
+    SEX = list(color = c(F = "#0072B2", M = "#E69F00")),
+    AESEV = list(color = c(MILD = "#CA8A04"))
+  ))
+  expect_identical(scale_map_option_summary(NULL, map), "2 variables")
+  expect_identical(
+    scale_map_option_summary(NULL, as_scale_map(list(SEX = list()))),
+    "1 variable"
+  )
+  expect_identical(scale_map_option_summary(NULL, new_scale_map()),
+                   "No variables")
+})
+
+test_that("the editor asks the options sidebar for more width", {
+  ui <- as.character(scale_map_editor_ui("x"))
+  expect_match(ui, 'data-blockr-page-width="480"', fixed = TRUE)
+  expect_match(ui, 'class="bsm-editor"', fixed = TRUE)
+})
