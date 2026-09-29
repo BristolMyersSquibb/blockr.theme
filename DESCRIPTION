@@ -1,6 +1,6 @@
 Package: blockr.theme
 Title: Board-Level Theming for Blockr
-Version: 0.0.0.9003
+Version: 0.0.0.9004
 Authors@R:
     person(given = "Christoph",
            family = "Sax",

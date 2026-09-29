@@ -1,0 +1,207 @@
+/* The scale map editor, as a page of the board options sidebar. Drawn from
+   blockr.ui's design tokens, with the light values as fallbacks so the
+   editor still reads without them. One row per variable, collapsed, with
+   its level count; open, one row per level with its colour; the remove
+   buttons show on hover, as every small icon does. */
+
+.bsm-editor {
+  font-size: var(--blockr-font-size-base, 0.875rem);
+  color: var(--blockr-color-text-default, #111827);
+}
+
+.bsm-editor .form-group,
+.bsm-editor .shiny-input-container {
+  width: auto;
+  margin-bottom: 0;
+}
+
+/* --- A variable --- */
+.bsm-binding + .bsm-binding {
+  margin-top: 2px;
+}
+
+.bsm-binding > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: var(--blockr-radius-md, 6px);
+  list-style: none;
+  cursor: pointer;
+}
+
+.bsm-binding > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bsm-binding > summary:hover {
+  background: var(--blockr-color-bg-hover, #f3f4f6);
+}
+
+.bsm-chev {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--blockr-color-text-muted, #6b7280);
+  transition: transform var(--blockr-transition, 0.15s ease);
+}
+
+.bsm-binding[open] > summary .bsm-chev {
+  transform: rotate(90deg);
+}
+
+.bsm-var {
+  font-size: var(--blockr-font-size-xs, 0.75rem);
+  font-weight: var(--blockr-font-weight-semibold, 600);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--blockr-color-text-muted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bsm-count {
+  flex: 1 1 auto;
+  font-size: var(--blockr-font-size-xs, 0.75rem);
+  color: var(--blockr-color-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+/* --- Levels --- */
+.bsm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding-left: 18px;
+}
+
+.bsm-level {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The swatch: colourpicker's input, which paints itself in the colour. */
+.bsm-editor .colourpicker-input,
+.bsm-editor .colourpicker input.form-control {
+  width: 140px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--blockr-color-border-default, #e5e7eb);
+  border-radius: var(--blockr-radius-md, 6px);
+  font-family: var(--blockr-font-mono, monospace);
+  font-size: 11px;
+  box-shadow: none;
+}
+
+.bsm-note {
+  padding-left: 18px;
+  margin: 2px 0 4px;
+  font-size: var(--blockr-font-size-xs, 0.75rem);
+  color: var(--blockr-color-text-muted, #6b7280);
+}
+
+/* --- Small tools: remove (on hover) and add --- */
+.bsm-rm,
+.bsm-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--blockr-radius-sm, 4px);
+  background: transparent;
+  color: var(--blockr-color-text-muted, #6b7280);
+  cursor: pointer;
+}
+
+.bsm-rm {
+  visibility: hidden;
+}
+
+.bsm-row:hover .bsm-rm,
+.bsm-binding > summary:hover .bsm-rm,
+.bsm-rm:focus-visible {
+  visibility: visible;
+}
+
+.bsm-rm:hover {
+  color: var(--blockr-color-text-danger, #b91c1c);
+}
+
+.bsm-plus:hover {
+  background: var(--blockr-color-bg-hover, #f3f4f6);
+  color: var(--blockr-color-text-default, #111827);
+}
+
+/* --- Adding a level and a variable --- */
+.bsm-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding-left: 18px;
+  margin-bottom: 6px;
+}
+
+.bsm-add .shiny-input-container:first-child {
+  flex: 1 1 auto;
+}
+
+.bsm-editor .bsm-add input[type="text"]:not(.colourpicker-input) {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--blockr-color-border-default, #e5e7eb);
+  border-radius: var(--blockr-radius-md, 6px);
+  background: var(--blockr-color-bg-field, #f9fafb);
+  font-size: var(--blockr-font-size-sm, 0.8125rem);
+  box-shadow: none;
+}
+
+.bsm-addvar {
+  padding-left: 0;
+  margin-top: 14px;
+}
+
+.bsm-addvar-btn {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--blockr-color-border-default, #e5e7eb);
+  border-radius: var(--blockr-radius-md, 6px);
+  background: var(--blockr-color-bg-surface, #ffffff);
+  color: var(--blockr-color-text-default, #111827);
+  font-size: var(--blockr-font-size-sm, 0.8125rem);
+  font-weight: var(--blockr-font-weight-medium, 500);
+  cursor: pointer;
+}
+
+.bsm-addvar-btn:hover {
+  background: var(--blockr-color-bg-hover, #f3f4f6);
+  border-color: var(--blockr-color-border-strong, #d1d5db);
+}
+
+.bsm-empty {
+  padding: 8px 0;
+  font-size: var(--blockr-font-size-sm, 0.8125rem);
+  color: var(--blockr-color-text-muted, #6b7280);
+}
+
+/* colourpicker's popup is 173px wide and anchored left:0 to the input; with
+   the swatch at the sidebar's right edge it would overflow into the
+   scrollbar. Anchor it right so it grows leftward into the sidebar. */
+.bsm-editor .colourpicker-panel {
+  left: auto;
+  right: 0;
+}

@@ -15,47 +15,45 @@ scale_map_editor_dep <- function() {
   htmltools::htmlDependency(
     name = "blockr-theme-scale-map-editor",
     version = utils::packageVersion("blockr.theme"),
-    src = system.file("js", package = "blockr.theme"),
-    script = "scale-map-editor.js"
+    src = system.file(package = "blockr.theme"),
+    script = "js/scale-map-editor.js",
+    stylesheet = "css/scale-map-editor.css",
+    all_files = FALSE
   )
 }
 
+# The editor is a page of the board options sidebar (blockr.dock); it asks
+# the sidebar for more width while it is open (`data-blockr-page-width`).
 scale_map_editor_ui <- function(id) {
   htmltools::tagList(
     scale_map_editor_dep(),
-    htmltools::tags$style(htmltools::HTML(
-      ".bsm-editor { font-size: 0.875rem; }
-       .bsm-binding { margin-bottom: 0.5rem; }
-       .bsm-binding > summary { cursor: pointer; font-weight: 600; }
-       .bsm-row { display: flex; align-items: center; gap: 0.4rem;
-                  margin: 0.2rem 0 0.2rem 1rem; }
-       .bsm-row .form-group, .bsm-row .shiny-input-container {
-         margin-bottom: 0; width: 110px; }
-       .bsm-row .bsm-level { flex: 1; min-width: 0; overflow: hidden;
-         text-overflow: ellipsis; white-space: nowrap; }
-       .bsm-note { color: var(--bs-secondary-color, #6c757d);
-         margin-left: 1rem; font-size: 0.8em; }
-       .bsm-rm { border: none; background: none; color: inherit;
-         opacity: 0.5; padding: 0 0.25rem; }
-       .bsm-rm:hover { opacity: 1; }
-       .bsm-add { display: flex; align-items: center; gap: 0.4rem;
-                  margin: 0.3rem 0 0.3rem 1rem; }
-       .bsm-add .form-group, .bsm-add .shiny-input-container {
-         margin-bottom: 0; }
-       .bsm-add input[type='text'] { font-size: 0.875rem; }
-       .bsm-addvar { margin-top: 0.5rem; }
-       /* colourpicker's popup is 173px wide and anchored left:0 to the
-          input; with the 110px swatch at the sidebar's right edge it
-          overflows into the scrollbar. Anchor it right instead so it
-          grows leftward into the sidebar. */
-       .bsm-editor .colourpicker-panel { left: auto; right: 0; }"
-    )),
     htmltools::div(
       id = shiny::NS(id, "sm_editor"),
-      class = "bsm-editor"
+      class = "bsm-editor",
+      `data-blockr-page-width` = "480"
     )
   )
 }
+
+# Thin icons, drawn like the design system's small icons.
+bsm_icons <- list(
+  chev = paste0(
+    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" ',
+    'stroke="currentColor" stroke-width="1.25" stroke-linecap="round" ',
+    'stroke-linejoin="round" aria-hidden="true"><path d="M4.5 3l3 3-3 3">',
+    "</path></svg>"
+  ),
+  x = paste0(
+    '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" ',
+    'stroke="currentColor" stroke-width="1" stroke-linecap="round" ',
+    'aria-hidden="true"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5"></path></svg>'
+  ),
+  plus = paste0(
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" ',
+    'stroke="currentColor" stroke-width="1.25" stroke-linecap="round" ',
+    'aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>'
+  )
+)
 
 scale_map_editor_server <- function(board, ..., session) {
   ns <- session$ns
@@ -95,12 +93,15 @@ scale_map_editor_server <- function(board, ..., session) {
 
   # Every action re-renders the editor, which would drop the sidebar's scroll
   # offset; save it here, while the current nodes are still on screen.
-  funnel_btn <- function(label, payload_js, class = "bsm-rm") {
+  funnel_btn <- function(label, payload_js, class = "bsm-rm", title = NULL) {
     htmltools::tags$button(
       type = "button",
       class = class,
+      title = title,
+      `aria-label` = title,
       onclick = sprintf(
         paste0(
+          "event.preventDefault(); event.stopPropagation(); ",
           "window.blockrScaleMapEditor.saveScroll(%s); ",
           "Shiny.setInputValue(%s, %s, {priority: 'event'})"
         ),
@@ -133,7 +134,9 @@ scale_map_editor_server <- function(board, ..., session) {
           htmltools::span(class = "bsm-level", title = lv, lv),
           colourpicker::colourInput(ns(input_id), NULL,
                                     value = unname(fixed[[li]])),
-          funnel_btn("\u00d7", static_payload("rmlev", var, lv))
+          funnel_btn(htmltools::HTML(bsm_icons$x),
+                     static_payload("rmlev", var, lv),
+                     title = "Remove level")
         )
       })
     }
@@ -168,20 +171,36 @@ scale_map_editor_server <- function(board, ..., session) {
       js_str(var), js_str(ns(lev_id)), js_str(ns(col_id))
     )
 
+    count <- if (!is.null(fixed)) {
+      n <- length(fixed)
+      paste(n, if (n == 1L) "level" else "levels")
+    } else if (!is.null(color)) {
+      "colour pool"
+    } else {
+      "theme colours"
+    }
+
+    # Collapsed; which variables are open survives a re-render
+    # (scale-map-editor.js).
     htmltools::tags$details(
       class = "bsm-binding",
-      open = if (!is.null(fixed)) NA,
+      `data-var` = var,
       htmltools::tags$summary(
-        var,
-        funnel_btn("\u00d7", static_payload("rmvar", var))
+        htmltools::span(class = "bsm-chev", htmltools::HTML(bsm_icons$chev)),
+        htmltools::span(class = "bsm-var", title = var, var),
+        htmltools::span(class = "bsm-count", paste0("\u00b7 ", count)),
+        funnel_btn(htmltools::HTML(bsm_icons$x),
+                   static_payload("rmvar", var),
+                   title = "Remove variable")
       ),
       level_rows,
       lapply(notes, function(n) htmltools::div(class = "bsm-note", n)),
       htmltools::div(
         class = "bsm-add",
-        shiny::textInput(ns(lev_id), NULL, placeholder = "add level..."),
+        shiny::textInput(ns(lev_id), NULL, placeholder = "Add level"),
         colourpicker::colourInput(ns(col_id), NULL, value = "#888888"),
-        funnel_btn("+", add_payload, class = "bsm-rm")
+        funnel_btn(htmltools::HTML(bsm_icons$plus), add_payload,
+                   class = "bsm-plus", title = "Add level")
       )
     )
   }
@@ -197,19 +216,19 @@ scale_map_editor_server <- function(board, ..., session) {
       js_str(ns(var_id))
     )
 
+    # No "Scales" label: the sidebar page is titled by its category.
     content <- htmltools::tagList(
-      htmltools::tags$label("Scales"),
       if (length(map)) {
         lapply(seq_along(map), function(bi) {
           binding_tags(names(map)[[bi]], map[[bi]], gen, bi)
         })
       } else {
-        htmltools::div(class = "bsm-note", "No bindings defined")
+        htmltools::div(class = "bsm-empty", "No variables yet")
       },
       htmltools::div(
         class = "bsm-add bsm-addvar",
-        shiny::textInput(ns(var_id), NULL, placeholder = "add variable..."),
-        funnel_btn("+", addvar_payload, class = "bsm-rm")
+        shiny::textInput(ns(var_id), NULL, placeholder = "Variable name"),
+        funnel_btn("Add variable", addvar_payload, class = "bsm-addvar-btn")
       )
     )
 
