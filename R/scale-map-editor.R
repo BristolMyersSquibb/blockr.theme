@@ -41,7 +41,7 @@ bsm_icons <- list(
     '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" ',
     'stroke="currentColor" stroke-width="1.25" stroke-linecap="round" ',
     'stroke-linejoin="round" aria-hidden="true"><path d="M4.5 3l3 3-3 3">',
-    '</path></svg>'
+    "</path></svg>"
   ),
   x = paste0(
     '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" ',
