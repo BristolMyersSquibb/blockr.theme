@@ -139,6 +139,21 @@ test_that("resolve_scales: fixed values, pool fallback, order", {
   expect_null(resolve_scales(NULL, "BOR", levels = "CR"))
 })
 
+test_that("resolve_scales_col: a factor's levels set the order", {
+  m <- new_scale_map(
+    scale_binding("GR", color = c("1" = "#111111", "2" = "#222222", "3" = "#333333"))
+  )
+
+  fct <- factor(c("1", "3", "2"), levels = c("3", "2", "1"))
+  r <- resolve_scales_col(m, "GR", fct)
+  expect_identical(r$order, c("3", "2", "1"))
+  expect_identical(r$color[["3"]], "#333333")
+
+  # character keeps the binding's order
+  r2 <- resolve_scales_col(m, "GR", c("3", "1", "2"))
+  expect_identical(r2$order, c("1", "2", "3"))
+})
+
 test_that("resolve_scales: hash assignment is stable across level subsets", {
   m <- new_scale_map(scale_binding("TRT"))
   pal <- c("#0072B2", "#D55E00", "#F0E442")

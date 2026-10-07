@@ -354,7 +354,8 @@ resolve_scales <- function(map, var, levels, palette = NULL) {
 #'   `blockr_source` attribute -- the provenance stamped by column-copying
 #'   blocks such as the picker -- is tried instead, so a copy inherits its
 #'   source column's binding (a "color" column picked from SEX keeps the
-#'   fixed SEX colors).
+#'   fixed SEX colors). A factor's levels also set `order`, ahead of the
+#'   binding's: a factor declares the order the data wants shown.
 #' @rdname new_scale_map
 #' @export
 resolve_scales_col <- function(map, var, column, palette = NULL) {
@@ -379,7 +380,11 @@ resolve_scales_col <- function(map, var, column, palette = NULL) {
     }
   }
 
-  resolve_scales(m, bind_var, levels = levels, palette = palette)
+  res <- resolve_scales(m, bind_var, levels = levels, palette = palette)
+  # A factor's levels are the data's own order and beat the binding's: the
+  # binding still colours each level by name.
+  if (!is.null(res) && is.factor(column)) res$order <- levels
+  res
 }
 
 #' @rdname new_scale_map

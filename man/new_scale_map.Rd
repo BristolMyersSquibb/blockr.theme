@@ -58,7 +58,8 @@ dropped), and when \code{var} is not bound in the map the column's
 \code{blockr_source} attribute -- the provenance stamped by column-copying
 blocks such as the picker -- is tried instead, so a copy inherits its
 source column's binding (a "color" column picked from SEX keeps the
-fixed SEX colors).}
+fixed SEX colors). A factor's levels also set \code{order}, ahead of the
+binding's: a factor declares the order the data wants shown.}
 
 \item{category}{Settings sidebar category}
 }
