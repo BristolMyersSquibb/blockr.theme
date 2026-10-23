@@ -124,14 +124,21 @@
   cursor: pointer;
 }
 
+/* Hidden with opacity, not visibility, so Tab still reaches it. While hidden
+   it takes no clicks, so a tap on a touch screen cannot remove anything
+   unseen. */
 .bsm-rm {
-  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .bsm-row:hover .bsm-rm,
+.bsm-row:focus-within .bsm-rm,
 .bsm-binding > summary:hover .bsm-rm,
+.bsm-binding > summary:focus-within .bsm-rm,
 .bsm-rm:focus-visible {
-  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .bsm-rm:hover {
