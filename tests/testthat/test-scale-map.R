@@ -141,7 +141,10 @@ test_that("resolve_scales: fixed values, pool fallback, order", {
 
 test_that("resolve_scales_col: a factor's levels set the order", {
   m <- new_scale_map(
-    scale_binding("GR", color = c("1" = "#111111", "2" = "#222222", "3" = "#333333"))
+    scale_binding(
+      "GR",
+      color = c("1" = "#111111", "2" = "#222222", "3" = "#333333")
+    )
   )
 
   fct <- factor(c("1", "3", "2"), levels = c("3", "2", "1"))
