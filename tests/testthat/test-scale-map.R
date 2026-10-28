@@ -283,3 +283,28 @@ test_that("resolve_scales_col notes the levels shown, per bound variable", {
   expect_identical(scale_map_seen_levels("USUBJID", session = NULL),
                    character())
 })
+
+test_that("a hashed level never takes a colour pinned in its binding", {
+  pool <- c("#111111", "#222222", "#333333", "#444444")
+  lv <- paste0("ARM", 1:40)
+  plain <- resolve_scales(new_scale_map(scale_binding("T", color = pool)),
+                          "T", lv)$color
+  pinned_col <- plain[["ARM1"]]
+  map <- new_scale_map(scale_binding(
+    "T", color = c(ARM1 = toupper(pinned_col), pool)
+  ))
+  r <- resolve_scales(map, "T", lv)$color
+
+  others <- setdiff(lv, "ARM1")
+  expect_false(any(tolower(r[others]) == tolower(pinned_col)))
+  # only the levels that landed on the pinned colour move
+  moved <- others[plain[others] != r[others]]
+  expect_true(all(plain[moved] == pinned_col))
+  expect_gt(length(moved), 0L)
+
+  # every pool colour pinned: the hash stands
+  full <- new_scale_map(scale_binding(
+    "T", color = c(A = pool[1], B = pool[2], C = pool[3], D = pool[4], pool)
+  ))
+  expect_true(resolve_scales(full, "T", "E")$color %in% pool)
+})

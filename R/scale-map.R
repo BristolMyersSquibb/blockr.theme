@@ -25,7 +25,10 @@ SCALE_MAP_POOL_KEY <- ".pool"
 #' display order), *unnamed* entries are a pool from which the other levels
 #' are assigned by a stable hash of the level name (consistent across views,
 #' sessions and data refreshes). One vector may hold both: pinned patients on
-#' top of a patient pool, `c("01-701-1015" = "#d55e00", pool)`. Levels of a `color` channel not covered by
+#' top of a patient pool, `c("01-701-1015" = "#d55e00", pool)`. A hashed
+#' level never takes a value pinned in the same binding: it moves on to the
+#' next pool entry, so a new treatment arm cannot share a pinned arm's colour
+#' while the pool has a free one. Levels of a `color` channel not covered by
 #' either fall back to the map's board palette, then to the palette supplied
 #' at resolution time (typically the renderer's default colors).
 #'
@@ -342,9 +345,22 @@ scale_spec_pool <- function(spec) {
 # drift is accepted — views stay consistent with each other, which is what
 # matters. Pin expected colors in a test and it will fail on the next rlang
 # hash change.
-scale_map_hash_pick <- function(level, pool) {
-  idx <- strtoi(substr(rlang::hash(level), 1L, 7L), 16L) %% length(pool)
-  pool[[idx + 1L]]
+#
+# `taken`: values pinned to other levels of the same binding. A hashed level
+# that lands on one of them steps on to the next pool entry nobody pinned, so
+# a new treatment arm never takes a pinned arm's colour. The pool keeps its
+# length, so pinning one level only moves the levels that landed on exactly
+# that colour. This depends on the binding alone, never on which levels a
+# view shows.
+scale_map_hash_pick <- function(level, pool, taken = NULL) {
+  n <- length(pool)
+  idx <- strtoi(substr(rlang::hash(level), 1L, 7L), 16L) %% n
+  free <- !tolower(as.character(pool)) %in% tolower(as.character(taken))
+  if (!any(free)) {
+    return(pool[[idx + 1L]])
+  }
+  step <- which(free[(seq_len(n) + idx - 1L) %% n + 1L])[[1L]] - 1L
+  pool[[(idx + step) %% n + 1L]]
 }
 
 #' @param map A `scale_map` (or plain list of the same shape, or `NULL`)
@@ -376,7 +392,7 @@ resolve_scales <- function(map, var, levels, palette = NULL) {
       if (!is.null(fixed) && lv %in% names(fixed)) {
         fixed[[lv]]
       } else if (!is.null(pool) && length(pool)) {
-        scale_map_hash_pick(lv, pool)
+        scale_map_hash_pick(lv, pool, taken = unname(fixed))
       } else {
         NULL
       }

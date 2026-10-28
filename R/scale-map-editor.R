@@ -136,7 +136,8 @@ scale_map_editor_server <- function(board, ..., session) {
         # On a pooled binding, the colour the hash would give, so a user
         # sees what unpinning brings back.
         hint <- if (!is.null(pool)) {
-          hashed <- scale_map_hash_pick(lv, pool)
+          hashed <- scale_map_hash_pick(lv, pool,
+                                        taken = unname(fixed[-li]))
           htmltools::span(
             class = "bsm-hashed",
             title = paste("Unpinned:", hashed),
