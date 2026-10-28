@@ -7,10 +7,10 @@ test_that("scale_binding validates channels", {
   expect_s3_class(b, "scale_binding")
   expect_named(b$color, c("CR", "PD"))
 
-  expect_error(
-    scale_binding("X", color = c(CR = "#1", "#2")),
-    "fully named"
-  )
+  # named and unnamed entries mix: pins on top of a pool
+  mixed <- scale_binding("X", color = c(CR = "#1", "#2", "#3"))
+  expect_identical(scale_spec_fixed(mixed$color), c(CR = "#1"))
+  expect_identical(scale_spec_pool(mixed$color), c("#2", "#3"))
   expect_error(
     scale_binding("X", color = c(CR = "#1", CR = "#2")),
     "duplicated"
@@ -182,6 +182,7 @@ test_that("scale_map option round-trips through core JSON serdes", {
     scale_binding("BEST_OVERALL_RESPONSE",
                   color = c(CR = "#111111", PD = "#222222")),
     scale_binding("USUBJID", color = c("#101010", "#202020")),
+    scale_binding("SUBJID", color = c(S1 = "#ff0000", "#101010", "#202020")),
     scale_binding("VISIT_TYPE", shape = c(EOT = 18L)),
     palette = c("#0072B2", "#D55E00")
   ))
@@ -227,4 +228,58 @@ test_that("the editor asks the options sidebar for more width", {
   ui <- as.character(scale_map_editor_ui("x"))
   expect_match(ui, 'data-blockr-page-width="480"', fixed = TRUE)
   expect_match(ui, 'class="bsm-editor"', fixed = TRUE)
+})
+
+test_that("pins on top of a pool: pinned levels fixed, others hashed", {
+  pool <- palette_colors(12, "Many")
+  pinned <- new_scale_map(
+    scale_binding("USUBJID", color = c("01-701-1015" = "#d55e00", pool))
+  )
+  plain <- new_scale_map(scale_binding("USUBJID", color = pool))
+  ids <- c("01-701-1023", "01-701-1015", "01-704-1100")
+
+  r <- resolve_scales(pinned, "USUBJID", ids)
+  expect_identical(r$color[["01-701-1015"]], "#d55e00")
+  # unpinned patients keep the colour the pool alone gives them
+  r0 <- resolve_scales(plain, "USUBJID", ids)
+  expect_identical(r$color[c(1, 3)], r0$color[c(1, 3)])
+  expect_true(all(r$color[c(1, 3)] %in% pool))
+  # pinned first in the order
+  expect_identical(r$order[[1]], "01-701-1015")
+
+  expect_output(print(pinned), "fixed 1 \\+ pool 12")
+})
+
+test_that("a mixed channel round-trips through JSON", {
+  pool <- c("#101010", "#202020")
+  m <- new_scale_map(
+    scale_binding("USUBJID", color = c(A = "#ff0000", pool)),
+    scale_binding("BOR", color = c(CR = "#006400")),
+    scale_binding("RACE", color = pool)
+  )
+  js <- jsonlite::toJSON(scale_map_to_plain(m), auto_unbox = TRUE)
+  expect_match(js, '"\\.pool":\\["#101010","#202020"\\]')
+  back <- as_scale_map(jsonlite::fromJSON(js, simplifyVector = FALSE))
+  expect_identical(unclass(back), unclass(m))
+  back2 <- as_scale_map(jsonlite::fromJSON(js))
+  expect_identical(unclass(back2), unclass(m))
+})
+
+test_that("resolve_scales_col notes the levels shown, per bound variable", {
+  map <- new_scale_map(scale_binding("USUBJID", color = c("#1", "#2")))
+  session <- shiny::MockShinySession$new()
+  shiny::withReactiveDomain(session, {
+    resolve_scales_col(map, "USUBJID", c("b", "a"))
+    col <- c("c", "a")
+    attr(col, "blockr_source") <- "USUBJID"
+    resolve_scales_col(map, "color", col)
+    resolve_scales_col(map, "OTHER", c("x"))
+    expect_identical(
+      shiny::isolate(scale_map_seen_levels("USUBJID")), c("a", "b", "c")
+    )
+    expect_identical(shiny::isolate(scale_map_seen_levels("OTHER")),
+                     character())
+  })
+  expect_identical(scale_map_seen_levels("USUBJID", session = NULL),
+                   character())
 })
