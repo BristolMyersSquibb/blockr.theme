@@ -31,7 +31,7 @@ new_scale_map_option(map = new_scale_map(), category = "Scales", ...)
 \item{...}{For \code{new_scale_map()}: \code{scale_binding()} objects, \code{scale_map}
 objects or plain lists of the same shape (later entries win by variable
 name). For \code{new_scale_map_option()}: forwarded to
-\code{\link[blockr.core:new_board_options]{blockr.core::new_board_option()}}.}
+\code{\link[blockr.core:new_board_option]{blockr.core::new_board_option()}}.}
 
 \item{palette}{Fallback pool for the \code{color} channel when neither the
 binding nor the map carries one (typically the renderer's default
@@ -39,10 +39,10 @@ colors); \code{shape}/\code{linetype} have no fallback pool}
 
 \item{var}{Variable (column) name the binding applies to}
 
-\item{color, shape, linetype}{Channel vectors: named = fixed values per
-level (names are always matched as character, also for numeric-looking
-levels such as AE grades \code{"1"}–\code{"5"}), unnamed = pool for stable-hash
-auto-assignment. \code{shape} is coerced to integer (R \code{pch} / symbol codes).}
+\item{color, shape, linetype}{Channel vectors: named entries = fixed values
+per level (names are always matched as character, also for
+numeric-looking levels such as AE grades \code{"1"}–\code{"5"}), unnamed entries =
+pool for stable-hash auto-assignment. Both may be mixed in one vector. \code{shape} is coerced to integer (R \code{pch} / symbol codes).}
 
 \item{x}{Object to coerce / test}
 
@@ -75,10 +75,11 @@ variable; \code{new_scale_map_option()} returns a \code{board_option}.
 A scale map binds variable levels to aesthetics (colors, shapes, line
 types) board-wide: every rendering block that consumes the map shows the
 same level in the same color. Bindings are keyed by variable name. Each
-channel is one vector: a \emph{named} vector fixes values per level (stated in
-display order), an \emph{unnamed} vector is a pool from which unmatched levels
+channel is one vector: \emph{named} entries fix values per level (stated in
+display order), \emph{unnamed} entries are a pool from which the other levels
 are assigned by a stable hash of the level name (consistent across views,
-sessions and data refreshes). Levels of a \code{color} channel not covered by
+sessions and data refreshes). One vector may hold both: pinned patients on
+top of a patient pool, \code{c("01-701-1015" = "#d55e00", pool)}. Levels of a \code{color} channel not covered by
 either fall back to the map's board palette, then to the palette supplied
 at resolution time (typically the renderer's default colors).
 }
@@ -93,7 +94,7 @@ whole binding (no channel-level merge).
 # board palette as the fallback pool for bare registrations:
 map <- new_scale_map(
   scale_binding("BOR", color = c(CR = "#006400", PD = "#8b0000")),
-  scale_binding("USUBJID", color = c("#101010", "#202020")),
+  scale_binding("USUBJID", color = palette_colors(12, "Many")),
   scale_binding("RACE"),
   palette = c("#0072B2", "#D55E00", "#F0E442")
 )
@@ -108,5 +109,13 @@ study <- new_scale_map(
 # color, in every view (runnable board: dev/scale-map-demo.R):
 resolve_scales(study, "BOR", levels = c("PD", "CR", "NEW"))
 resolve_scales(study, "RACE", levels = c("WHITE", "ASIAN"))
+
+# Pins on top of a pool: the pinned patient keeps its colour, the others
+# are hashed into the pool.
+pts <- new_scale_map(scale_binding(
+  "USUBJID",
+  color = c("01-701-1015" = "#d55e00", palette_colors(12, "Many"))
+))
+resolve_scales(pts, "USUBJID", c("01-701-1015", "01-701-1023"))
 
 }

@@ -12,15 +12,23 @@ SCALE_MAP_CHANNELS <- c("color", "shape", "linetype")
 # rejected as a variable name in as_scale_map().
 SCALE_MAP_PALETTE_KEY <- ".palette"
 
+# Reserved key carrying the pool of a channel that also has fixed values,
+# when the channel travels as a JSON object.
+SCALE_MAP_POOL_KEY <- ".pool"
+
 #' Scale map: study-wide level aesthetics
 #'
 #' A scale map binds variable levels to aesthetics (colors, shapes, line
 #' types) board-wide: every rendering block that consumes the map shows the
 #' same level in the same color. Bindings are keyed by variable name. Each
-#' channel is one vector: a *named* vector fixes values per level (stated in
-#' display order), an *unnamed* vector is a pool from which unmatched levels
+#' channel is one vector: *named* entries fix values per level (stated in
+#' display order), *unnamed* entries are a pool from which the other levels
 #' are assigned by a stable hash of the level name (consistent across views,
-#' sessions and data refreshes). Levels of a `color` channel not covered by
+#' sessions and data refreshes). One vector may hold both: pinned patients on
+#' top of a patient pool, `c("01-701-1015" = "#d55e00", pool)`. A hashed
+#' level never takes a value pinned in the same binding: it moves on to the
+#' next pool entry, so a new treatment arm cannot share a pinned arm's colour
+#' while the pool has a free one. Levels of a `color` channel not covered by
 #' either fall back to the map's board palette, then to the palette supplied
 #' at resolution time (typically the renderer's default colors).
 #'
@@ -34,10 +42,10 @@ SCALE_MAP_PALETTE_KEY <- ".palette"
 #'   name). For `new_scale_map_option()`: forwarded to
 #'   [blockr.core::new_board_option()].
 #' @param var Variable (column) name the binding applies to
-#' @param color,shape,linetype Channel vectors: named = fixed values per
-#'   level (names are always matched as character, also for numeric-looking
-#'   levels such as AE grades `"1"`–`"5"`), unnamed = pool for stable-hash
-#'   auto-assignment. `shape` is coerced to integer (R `pch` / symbol codes).
+#' @param color,shape,linetype Channel vectors: named entries = fixed values
+#'   per level (names are always matched as character, also for
+#'   numeric-looking levels such as AE grades `"1"`–`"5"`), unnamed entries =
+#'   pool for stable-hash auto-assignment. Both may be mixed in one vector. `shape` is coerced to integer (R `pch` / symbol codes).
 #' @param palette Optional board palette: an unnamed character vector of
 #'   colors used as the fallback pool for any binding without a pool of its
 #'   own. Carried with the map (and the board). When merging maps, the last
@@ -55,7 +63,7 @@ SCALE_MAP_PALETTE_KEY <- ".palette"
 #' # board palette as the fallback pool for bare registrations:
 #' map <- new_scale_map(
 #'   scale_binding("BOR", color = c(CR = "#006400", PD = "#8b0000")),
-#'   scale_binding("USUBJID", color = c("#101010", "#202020")),
+#'   scale_binding("USUBJID", color = palette_colors(12, "Many")),
 #'   scale_binding("RACE"),
 #'   palette = c("#0072B2", "#D55E00", "#F0E442")
 #' )
@@ -70,6 +78,14 @@ SCALE_MAP_PALETTE_KEY <- ".palette"
 #' # color, in every view (runnable board: dev/scale-map-demo.R):
 #' resolve_scales(study, "BOR", levels = c("PD", "CR", "NEW"))
 #' resolve_scales(study, "RACE", levels = c("WHITE", "ASIAN"))
+#'
+#' # Pins on top of a pool: the pinned patient keeps its colour, the others
+#' # are hashed into the pool.
+#' pts <- new_scale_map(scale_binding(
+#'   "USUBJID",
+#'   color = c("01-701-1015" = "#d55e00", palette_colors(12, "Many"))
+#' ))
+#' resolve_scales(pts, "USUBJID", c("01-701-1015", "01-701-1023"))
 #'
 #' @export
 new_scale_map <- function(..., palette = NULL) {
@@ -145,9 +161,19 @@ validate_channel <- function(x, channel, var) {
   }
 
   if (is.list(x)) {
+    # Serialized form of a mixed channel: the fixed values as a named list
+    # with the pool under SCALE_MAP_POOL_KEY (see scale_map_to_plain()).
+    pool <- NULL
+    if (SCALE_MAP_POOL_KEY %in% names(x)) {
+      pool <- unlist(x[[SCALE_MAP_POOL_KEY]], use.names = FALSE)
+      x <- x[names(x) != SCALE_MAP_POOL_KEY]
+    }
     nms <- names(x)
     x <- unlist(x, use.names = FALSE)
     names(x) <- nms
+    if (length(pool)) {
+      x <- c(x, pool)
+    }
   }
 
   if (!is.atomic(x) || length(x) == 0L) {
@@ -155,16 +181,19 @@ validate_channel <- function(x, channel, var) {
          "` must be a non-empty vector.", call. = FALSE)
   }
 
+  # NA names (from c() of a named and an unnamed vector in some paths) mean
+  # unnamed; no named entry at all means a plain pool.
   nms <- names(x)
-  named <- !is.null(nms) & nzchar(nms %||% "")
-
-  if (!is.null(nms) && any(named) && !all(named)) {
-    stop("Channel `", channel, "` of binding `", var,
-         "` must be fully named (fixed values) or fully unnamed (pool).",
-         call. = FALSE)
+  if (!is.null(nms)) {
+    nms[is.na(nms)] <- ""
+    names(x) <- nms
+    if (!any(nzchar(nms))) {
+      names(x) <- NULL
+      nms <- NULL
+    }
   }
 
-  if (!is.null(nms) && anyDuplicated(nms)) {
+  if (!is.null(nms) && anyDuplicated(nms[nzchar(nms)])) {
     stop("Channel `", channel, "` of binding `", var,
          "` has duplicated level names.", call. = FALSE)
   }
@@ -252,8 +281,15 @@ print.scale_map <- function(x, ...) {
       paste(
         vapply(chs, function(ch) {
           v <- x[[var]][[ch]]
-          paste0(ch, "[", if (is.null(names(v))) "pool" else "fixed",
-                 " ", length(v), "]")
+          parts <- c(
+            if (length(scale_spec_fixed(v))) {
+              paste("fixed", length(scale_spec_fixed(v)))
+            },
+            if (length(scale_spec_pool(v))) {
+              paste("pool", length(scale_spec_pool(v)))
+            }
+          )
+          paste0(ch, "[", paste(parts, collapse = " + "), "]")
         }, character(1L)),
         collapse = ", "
       )
@@ -263,6 +299,40 @@ print.scale_map <- function(x, ...) {
     cat("  ", var, ": ", desc, "\n", sep = "")
   }
   invisible(x)
+}
+
+#' Split a scale map channel into fixed values and pool
+#'
+#' A channel vector holds fixed values (named entries) and a pool (unnamed
+#' entries), in any mix. Renderers that look at a binding themselves, rather
+#' than through [resolve_scales()], use these two to read it.
+#'
+#' @param spec One channel vector of a binding, e.g. `map[["USUBJID"]]$color`.
+#' @return `scale_spec_fixed()`: the named entries, or `NULL`.
+#'   `scale_spec_pool()`: the unnamed entries without names, or `NULL`.
+#' @examples
+#' spec <- c("01-701-1015" = "#d55e00", "#0072b2", "#e69f00")
+#' scale_spec_fixed(spec)
+#' scale_spec_pool(spec)
+#' @export
+scale_spec_fixed <- function(spec) {
+  nms <- names(spec)
+  if (!length(spec) || is.null(nms)) {
+    return(NULL)
+  }
+  keep <- !is.na(nms) & nzchar(nms)
+  if (any(keep)) spec[keep] else NULL
+}
+
+#' @rdname scale_spec_fixed
+#' @export
+scale_spec_pool <- function(spec) {
+  if (!length(spec)) {
+    return(NULL)
+  }
+  nms <- names(spec)
+  keep <- if (is.null(nms)) rep(TRUE, length(spec)) else is.na(nms) | !nzchar(nms)
+  if (any(keep)) unname(spec[keep]) else NULL
 }
 
 # Auto-assignment for one level: a pure function of the level name, so a value
@@ -275,9 +345,22 @@ print.scale_map <- function(x, ...) {
 # drift is accepted — views stay consistent with each other, which is what
 # matters. Pin expected colors in a test and it will fail on the next rlang
 # hash change.
-scale_map_hash_pick <- function(level, pool) {
-  idx <- strtoi(substr(rlang::hash(level), 1L, 7L), 16L) %% length(pool)
-  pool[[idx + 1L]]
+#
+# `taken`: values pinned to other levels of the same binding. A hashed level
+# that lands on one of them steps on to the next pool entry nobody pinned, so
+# a new treatment arm never takes a pinned arm's colour. The pool keeps its
+# length, so pinning one level only moves the levels that landed on exactly
+# that colour. This depends on the binding alone, never on which levels a
+# view shows.
+scale_map_hash_pick <- function(level, pool, taken = NULL) {
+  n <- length(pool)
+  idx <- strtoi(substr(rlang::hash(level), 1L, 7L), 16L) %% n
+  free <- !tolower(as.character(pool)) %in% tolower(as.character(taken))
+  if (!any(free)) {
+    return(pool[[idx + 1L]])
+  }
+  step <- which(free[(seq_len(n) + idx - 1L) %% n + 1L])[[1L]] - 1L
+  pool[[(idx + step) %% n + 1L]]
 }
 
 #' @param map A `scale_map` (or plain list of the same shape, or `NULL`)
@@ -302,15 +385,14 @@ resolve_scales <- function(map, var, levels, palette = NULL) {
 
   resolve_channel <- function(channel, fallback_pool = NULL) {
     spec <- binding[[channel]]
-    fixed <- if (!is.null(spec) && !is.null(names(spec))) spec
-    pool <- if (!is.null(spec) && is.null(names(spec))) spec
-    pool <- pool %||% fallback_pool
+    fixed <- scale_spec_fixed(spec)
+    pool <- scale_spec_pool(spec) %||% fallback_pool
 
     vals <- lapply(levels, function(lv) {
       if (!is.null(fixed) && lv %in% names(fixed)) {
         fixed[[lv]]
       } else if (!is.null(pool) && length(pool)) {
-        scale_map_hash_pick(lv, pool)
+        scale_map_hash_pick(lv, pool, taken = unname(fixed))
       } else {
         NULL
       }
@@ -328,7 +410,7 @@ resolve_scales <- function(map, var, levels, palette = NULL) {
 
   fixed_names <- unique(unlist(lapply(
     binding[SCALE_MAP_CHANNELS],
-    function(spec) names(spec)
+    function(spec) names(scale_spec_fixed(spec))
   )))
 
   res <- Filter(
@@ -381,6 +463,7 @@ resolve_scales_col <- function(map, var, column, palette = NULL) {
   }
 
   res <- resolve_scales(m, bind_var, levels = levels, palette = palette)
+  if (!is.null(res)) scale_map_note_levels(bind_var, levels)
   # A factor's levels are the data's own order and beat the binding's: the
   # binding still colours each level by name.
   if (!is.null(res) && is.factor(column)) res$order <- levels
@@ -436,7 +519,14 @@ scale_map_to_plain <- function(x) {
   # palette travels as the reserved `.palette` entry (unnamed -> array).
   plain <- lapply(unclass(x), function(binding) {
     lapply(binding, function(spec) {
-      if (!is.null(names(spec))) as.list(spec) else spec
+      fixed <- scale_spec_fixed(spec)
+      pool <- scale_spec_pool(spec)
+      if (is.null(fixed)) {
+        return(pool)
+      }
+      out <- as.list(fixed)
+      if (length(pool)) out[[SCALE_MAP_POOL_KEY]] <- pool
+      out
     })
   })
   pal <- attr(x, "palette", exact = TRUE)
