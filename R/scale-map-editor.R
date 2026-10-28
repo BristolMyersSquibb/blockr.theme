@@ -1,7 +1,9 @@
-# Sidebar editor for the "scale_map" board option. v1 scope (see
+# Sidebar editor for the "scale_map" board option (see
 # blockr.design/open/cdex-attribute-map): per-binding rows of level + color
-# swatch (recolor, add/remove levels, add/remove bindings); pools, shapes and
-# linetypes are shown read-only. Edits write the option value through
+# swatch (recolor, add/remove levels, add/remove bindings). A binding with a
+# colour pool (patient ids) shows the pool and its pinned levels; pinning a
+# level keeps the pool, and the level field offers the levels the board's
+# charts have shown. Shapes and linetypes are shown read-only. Edits write the option value through
 # set_board_option_value(), so they serialize with the board and consumers
 # re-render reactively.
 #
@@ -61,6 +63,7 @@ scale_map_editor_server <- function(board, ..., session) {
   st <- new.env(parent = emptyenv())
   st$gen <- 0L
   st$registry <- list() # raw input id -> list(var, level)
+  st$datalists <- list() # datalist id -> var
   st$rendered_sig <- NULL
   # Bumped on every render. The colour-scanner observer reads it FIRST so a
   # re-render (new generation of input ids) invalidates the observer and it
@@ -122,28 +125,39 @@ scale_map_editor_server <- function(board, ..., session) {
 
   binding_tags <- function(var, binding, gen, bi) {
     color <- binding$color
-    fixed <- if (!is.null(color) && !is.null(names(color))) color
+    fixed <- scale_spec_fixed(color)
+    pool <- scale_spec_pool(color)
 
     level_rows <- if (!is.null(fixed)) {
       lapply(seq_along(fixed), function(li) {
         lv <- names(fixed)[[li]]
         input_id <- sprintf("sm_c_%d_%d_%d", gen, bi, li)
         st$registry[[input_id]] <<- list(var = var, level = lv)
+        # On a pooled binding, the colour the hash would give, so a user
+        # sees what unpinning brings back.
+        hint <- if (!is.null(pool)) {
+          hashed <- scale_map_hash_pick(lv, pool)
+          htmltools::span(
+            class = "bsm-hashed",
+            title = paste("Unpinned:", hashed),
+            style = sprintf("background:%s", hashed)
+          )
+        }
         htmltools::div(
           class = "bsm-row",
-          htmltools::span(class = "bsm-level", title = lv, lv),
+          htmltools::span(class = "bsm-level", title = lv, lv, hint),
           colourpicker::colourInput(ns(input_id), NULL,
                                     value = unname(fixed[[li]])),
           funnel_btn(htmltools::HTML(bsm_icons$x),
                      static_payload("rmlev", var, lv),
-                     title = "Remove level")
+                     title = if (is.null(pool)) "Remove level" else "Unpin")
         )
       })
     }
 
     notes <- c(
-      if (!is.null(color) && is.null(names(color))) {
-        sprintf("pool of %d colors, auto-assigned", length(color))
+      if (!is.null(pool) && is.null(fixed)) {
+        "No level pinned. Every level takes its colour from the pool."
       },
       if (is.null(color)) "auto colors (theme palette)",
       if (!is.null(binding$shape)) {
@@ -162,6 +176,8 @@ scale_map_editor_server <- function(board, ..., session) {
 
     lev_id <- sprintf("sm_nl_%d_%d", gen, bi)
     col_id <- sprintf("sm_nc_%d_%d", gen, bi)
+    list_id <- sprintf("sm_dl_%d_%d", gen, bi)
+    st$datalists[[ns(list_id)]] <<- var
     add_payload <- sprintf(
       paste0(
         "{action:'addlev', var:%s, ",
@@ -171,14 +187,47 @@ scale_map_editor_server <- function(board, ..., session) {
       js_str(var), js_str(ns(lev_id)), js_str(ns(col_id))
     )
 
-    count <- if (!is.null(fixed)) {
+    count <- if (!is.null(pool)) {
+      paste0(
+        "pool of ", length(pool),
+        if (!is.null(fixed)) paste0(" \u00b7 ", length(fixed), " pinned")
+      )
+    } else if (!is.null(fixed)) {
       n <- length(fixed)
       paste(n, if (n == 1L) "level" else "levels")
-    } else if (!is.null(color)) {
-      "colour pool"
     } else {
       "theme colours"
     }
+
+    # A new pin starts on a pool colour no pin holds yet.
+    new_colour <- if (!is.null(pool)) {
+      setdiff(pool, unname(fixed))[1L] %|NA|% pool[[1L]]
+    } else {
+      "#888888"
+    }
+
+    pool_strip <- if (!is.null(pool)) {
+      shown <- utils::head(pool, 24L)
+      htmltools::div(
+        class = "bsm-pool",
+        title = "Unpinned levels are assigned from this pool by a hash of the level",
+        lapply(shown, function(c) {
+          htmltools::span(style = sprintf("background:%s", c), title = c)
+        }),
+        if (length(pool) > length(shown)) {
+          htmltools::span(class = "bsm-pool-more",
+                          paste0("+", length(pool) - length(shown)))
+        }
+      )
+    }
+
+    lev_input <- shiny::textInput(
+      ns(lev_id), NULL,
+      placeholder = if (is.null(pool)) "Add level" else "Pin a level"
+    )
+    lev_input <- htmltools::tagQuery(lev_input)$find("input")$addAttrs(
+      list = ns(list_id), autocomplete = "off"
+    )$allTags()
 
     # Collapsed; which variables are open survives a re-render
     # (scale-map-editor.js).
@@ -193,14 +242,17 @@ scale_map_editor_server <- function(board, ..., session) {
                    static_payload("rmvar", var),
                    title = "Remove variable")
       ),
+      pool_strip,
       level_rows,
       lapply(notes, function(n) htmltools::div(class = "bsm-note", n)),
       htmltools::div(
         class = "bsm-add",
-        shiny::textInput(ns(lev_id), NULL, placeholder = "Add level"),
-        colourpicker::colourInput(ns(col_id), NULL, value = "#888888"),
+        lev_input,
+        htmltools::tags$datalist(id = ns(list_id)),
+        colourpicker::colourInput(ns(col_id), NULL, value = new_colour),
         funnel_btn(htmltools::HTML(bsm_icons$plus), add_payload,
-                   class = "bsm-plus", title = "Add level")
+                   class = "bsm-plus",
+                   title = if (is.null(pool)) "Add level" else "Pin level")
       )
     )
   }
@@ -208,6 +260,7 @@ scale_map_editor_server <- function(board, ..., session) {
   render_editor <- function(map) {
     st$gen <- st$gen + 1L
     st$registry <- list()
+    st$datalists <- list()
 
     gen <- st$gen
     var_id <- sprintf("sm_nv_%d", gen)
@@ -254,6 +307,20 @@ scale_map_editor_server <- function(board, ..., session) {
     st$rendered_sig <- structure_sig(map)
     st$render_count(shiny::isolate(st$render_count()) + 1L)
   }
+
+  # The level fields' suggestions: the levels the board's charts have shown
+  # for each variable (see seen-levels.R), refreshed as charts render more.
+  obs_levels <- shiny::observe({
+    st$render_count()
+    for (list_id in names(st$datalists)) {
+      session$sendCustomMessage(
+        "blockr.theme-scale-map-levels",
+        list(id = list_id,
+             levels = I(scale_map_seen_levels(st$datalists[[list_id]],
+                                              session)))
+      )
+    }
+  })
 
   obs_value <- shiny::observe({
     map <- current_map()
@@ -306,17 +373,17 @@ scale_map_editor_server <- function(board, ..., session) {
       map[[var]] <- NULL
     } else if (identical(act$action, "rmlev") && var %in% names(map)) {
       color <- map[[var]][["color"]]
-      color <- color[setdiff(names(color), act$level)]
-      map[[var]][["color"]] <- if (length(color)) color
+      fixed <- scale_spec_fixed(color)
+      fixed <- fixed[setdiff(names(fixed), act$level)]
+      map[[var]][["color"]] <- join_channel(fixed, scale_spec_pool(color))
     } else if (identical(act$action, "addlev") && var %in% names(map)) {
       lv <- trimws(act$level %||% "")
       if (nzchar(lv)) {
         color <- map[[var]][["color"]]
-        if (!is.null(color) && is.null(names(color))) {
-          return() # pool channel: not editable in v1
-        }
-        color <- color[setdiff(names(color), lv)]
-        map[[var]][["color"]] <- c(color, stats_setNames(act$color, lv))
+        fixed <- scale_spec_fixed(color)
+        fixed <- c(fixed[setdiff(names(fixed), lv)],
+                   stats_setNames(act$color, lv))
+        map[[var]][["color"]] <- join_channel(fixed, scale_spec_pool(color))
       }
     } else if (identical(act$action, "addvar")) {
       var <- trimws(var)
@@ -330,8 +397,16 @@ scale_map_editor_server <- function(board, ..., session) {
     render_editor(new)
   })
 
-  list(obs_value, obs_colors, obs_action)
+  list(obs_value, obs_colors, obs_action, obs_levels)
 }
+
+# Fixed values first, then the pool; NULL when both are empty.
+join_channel <- function(fixed, pool) {
+  out <- c(fixed, pool)
+  if (length(out)) out
+}
+
+`%|NA|%` <- function(x, y) if (length(x) && !is.na(x)) x else y
 
 stats_setNames <- function(x, nm) {
   names(x) <- nm

@@ -212,3 +212,36 @@
   left: auto;
   right: 0;
 }
+
+/* --- A pooled binding: its pool and the hint on a pinned level --- */
+.bsm-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding-left: 18px;
+  margin: 2px 0 6px;
+}
+
+.bsm-pool > span:not(.bsm-pool-more) {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--blockr-radius-sm, 4px);
+}
+
+.bsm-pool-more {
+  margin-left: 4px;
+  font-size: var(--blockr-font-size-xs, 0.75rem);
+  color: var(--blockr-color-text-muted, #6b7280);
+}
+
+/* The colour the hash would give the level if it were unpinned. */
+.bsm-hashed {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+  opacity: 0.8;
+}

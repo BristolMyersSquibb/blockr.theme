@@ -80,4 +80,19 @@
   window.blockrScaleMapEditor = { saveScroll: saveScroll };
 
   Shiny.addCustomMessageHandler(MSG, restoreScroll);
+
+  // Suggestions for a level field: the levels the board's charts have shown.
+  Shiny.addCustomMessageHandler("blockr.theme-scale-map-levels", function (msg) {
+    var list = document.getElementById(msg.id);
+    if (!list) {
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    (msg.levels || []).forEach(function (lv) {
+      var opt = document.createElement("option");
+      opt.value = lv;
+      frag.appendChild(opt);
+    });
+    list.replaceChildren(frag);
+  });
 })();
