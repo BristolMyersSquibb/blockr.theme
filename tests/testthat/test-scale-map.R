@@ -308,3 +308,52 @@ test_that("a hashed level never takes a colour pinned in its binding", {
   ))
   expect_true(resolve_scales(full, "T", "E")$color %in% pool)
 })
+
+test_that("a variable added in the editor starts on the Many pool", {
+  map <- scale_map_apply_action(new_scale_map(),
+                                list(action = "addvar", var = " USUBJID "))
+  expect_identical(map$USUBJID$color, palette_colors(NULL, "Many"))
+  expect_null(names(map$USUBJID$color))
+
+  res <- resolve_scales(map, "USUBJID", c("01-701-1015", "01-701-1023"))
+  expect_true(all(res$color %in% palette_colors(NULL, "Many")))
+})
+
+test_that("removing the pool keeps the pins, adding it back keeps them too", {
+  map <- new_scale_map(scale_binding(
+    "USUBJID",
+    color = c("01-701-1015" = "#d55e00", palette_colors(NULL, "Many"))
+  ))
+
+  map <- scale_map_apply_action(map, list(action = "rmpool", var = "USUBJID"))
+  expect_identical(map$USUBJID$color, c("01-701-1015" = "#d55e00"))
+
+  map <- scale_map_apply_action(map, list(action = "addpool", var = "USUBJID"))
+  expect_identical(scale_spec_fixed(map$USUBJID$color),
+                   c("01-701-1015" = "#d55e00"))
+  expect_identical(scale_spec_pool(map$USUBJID$color),
+                   palette_colors(NULL, "Many"))
+})
+
+test_that("removing the pool of an unpinned binding leaves a bare binding", {
+  map <- scale_map_apply_action(new_scale_map(),
+                                list(action = "addvar", var = "USUBJID"))
+  map <- scale_map_apply_action(map, list(action = "rmpool", var = "USUBJID"))
+  expect_true("USUBJID" %in% names(map))
+  expect_null(map$USUBJID$color)
+})
+
+test_that("pinning and unpinning keep the pool", {
+  map <- scale_map_apply_action(new_scale_map(),
+                                list(action = "addvar", var = "USUBJID"))
+  map <- scale_map_apply_action(map, list(action = "addlev", var = "USUBJID",
+                                          level = "01-701-1015",
+                                          color = "#d55e00"))
+  expect_identical(scale_spec_fixed(map$USUBJID$color),
+                   c("01-701-1015" = "#d55e00"))
+  expect_length(scale_spec_pool(map$USUBJID$color), 240L)
+
+  map <- scale_map_apply_action(map, list(action = "rmlev", var = "USUBJID",
+                                          level = "01-701-1015"))
+  expect_identical(map$USUBJID$color, palette_colors(NULL, "Many"))
+})

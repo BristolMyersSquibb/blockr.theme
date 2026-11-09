@@ -3,7 +3,8 @@
 # swatch (recolor, add/remove levels, add/remove bindings). A binding with a
 # colour pool (patient ids) shows the pool and its pinned levels; pinning a
 # level keeps the pool, and the level field offers the levels the board's
-# charts have shown. Shapes and linetypes are shown read-only. Edits write the option value through
+# charts have shown. A variable added here starts on the "Many" pool; removing
+# the pool keeps the pins. Shapes and linetypes are shown read-only. Edits write the option value through
 # set_board_option_value(), so they serialize with the board and consumers
 # re-render reactively.
 #
@@ -160,7 +161,7 @@ scale_map_editor_server <- function(board, ..., session) {
       if (!is.null(pool) && is.null(fixed)) {
         "No level pinned. Every level takes its colour from the pool."
       },
-      if (is.null(color)) "auto colors (theme palette)",
+      if (is.null(color)) "Levels take the chart's palette.",
       if (!is.null(binding$shape)) {
         sprintf("shapes: %s", paste(
           paste0(names(binding$shape), "=", binding$shape),
@@ -218,7 +219,19 @@ scale_map_editor_server <- function(board, ..., session) {
         if (length(pool) > length(shown)) {
           htmltools::span(class = "bsm-pool-more",
                           paste0("+", length(pool) - length(shown)))
-        }
+        },
+        funnel_btn(htmltools::HTML(bsm_icons$x),
+                   static_payload("rmpool", var),
+                   title = "Remove pool: only pinned levels keep a colour")
+      )
+    }
+
+    pool_add <- if (is.null(pool)) {
+      htmltools::div(
+        class = "bsm-pool-add",
+        funnel_btn("+ Add pool", static_payload("addpool", var),
+                   class = "bsm-link",
+                   title = "Hash unpinned levels into a pool of colours")
       )
     }
 
@@ -254,7 +267,8 @@ scale_map_editor_server <- function(board, ..., session) {
         funnel_btn(htmltools::HTML(bsm_icons$plus), add_payload,
                    class = "bsm-plus",
                    title = if (is.null(pool)) "Add level" else "Pin level")
-      )
+      ),
+      pool_add
     )
   }
 
@@ -366,39 +380,55 @@ scale_map_editor_server <- function(board, ..., session) {
   })
 
   obs_action <- shiny::observeEvent(session$input$sm_action, {
-    act <- session$input$sm_action
-    map <- unclass(current_map())
-    var <- act$var %||% ""
-
-    if (identical(act$action, "rmvar") && var %in% names(map)) {
-      map[[var]] <- NULL
-    } else if (identical(act$action, "rmlev") && var %in% names(map)) {
-      color <- map[[var]][["color"]]
-      fixed <- scale_spec_fixed(color)
-      fixed <- fixed[setdiff(names(fixed), act$level)]
-      map[[var]][["color"]] <- join_channel(fixed, scale_spec_pool(color))
-    } else if (identical(act$action, "addlev") && var %in% names(map)) {
-      lv <- trimws(act$level %||% "")
-      if (nzchar(lv)) {
-        color <- map[[var]][["color"]]
-        fixed <- scale_spec_fixed(color)
-        fixed <- c(fixed[setdiff(names(fixed), lv)],
-                   stats_setNames(act$color, lv))
-        map[[var]][["color"]] <- join_channel(fixed, scale_spec_pool(color))
-      }
-    } else if (identical(act$action, "addvar")) {
-      var <- trimws(var)
-      if (nzchar(var) && !var %in% names(map)) {
-        map[[var]] <- list()
-      }
-    }
-
-    new <- as_scale_map(map)
+    new <- scale_map_apply_action(current_map(), session$input$sm_action)
     write_map(new)
     render_editor(new)
   })
 
   list(obs_value, obs_colors, obs_action, obs_levels)
+}
+
+# The pool a binding added in the editor starts with: all of "Many", so a
+# variable with many levels (patient ids) gets few repeats. A binding written
+# in R without a pool still takes the board palette.
+scale_map_editor_pool <- function() {
+  palette_colors(NULL, "Many")
+}
+
+# One editor button press applied to the map. `act` is the payload a button
+# sends: `action`, `var`, and for levels `level` and `color`.
+scale_map_apply_action <- function(map, act) {
+  map <- unclass(as_scale_map(map) %||% new_scale_map())
+  var <- act$var %||% ""
+  color <- if (var %in% names(map)) map[[var]][["color"]]
+  fixed <- scale_spec_fixed(color)
+  pool <- scale_spec_pool(color)
+
+  if (identical(act$action, "rmvar") && var %in% names(map)) {
+    map[[var]] <- NULL
+  } else if (identical(act$action, "rmlev") && var %in% names(map)) {
+    fixed <- fixed[setdiff(names(fixed), act$level)]
+    map[[var]]["color"] <- list(join_channel(fixed, pool))
+  } else if (identical(act$action, "addlev") && var %in% names(map)) {
+    lv <- trimws(act$level %||% "")
+    if (nzchar(lv)) {
+      fixed <- c(fixed[setdiff(names(fixed), lv)],
+                 stats_setNames(act$color, lv))
+      map[[var]]["color"] <- list(join_channel(fixed, pool))
+    }
+  } else if (identical(act$action, "rmpool") && var %in% names(map)) {
+    # The pins stay; unpinned levels go back to the chart's palette.
+    map[[var]]["color"] <- list(join_channel(fixed, NULL))
+  } else if (identical(act$action, "addpool") && var %in% names(map)) {
+    map[[var]]["color"] <- list(join_channel(fixed, scale_map_editor_pool()))
+  } else if (identical(act$action, "addvar")) {
+    var <- trimws(var)
+    if (nzchar(var) && !var %in% names(map)) {
+      map[[var]] <- list(color = scale_map_editor_pool())
+    }
+  }
+
+  as_scale_map(map)
 }
 
 # Fixed values first, then the pool; NULL when both are empty.

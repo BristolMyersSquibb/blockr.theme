@@ -235,6 +235,30 @@
   color: var(--blockr-color-text-muted, #6b7280);
 }
 
+.bsm-pool:hover .bsm-rm,
+.bsm-pool:focus-within .bsm-rm {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bsm-pool-add {
+  padding-left: 18px;
+  margin: 6px 0 4px;
+}
+
+.bsm-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--blockr-font-size-xs, 0.75rem);
+  color: var(--blockr-color-text-link, #0072B2);
+  cursor: pointer;
+}
+
+.bsm-link:hover {
+  text-decoration: underline;
+}
+
 /* The colour the hash would give the level if it were unpinned. */
 .bsm-hashed {
   display: inline-block;
